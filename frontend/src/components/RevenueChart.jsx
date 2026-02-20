@@ -5,17 +5,18 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 
 // ── Dummy revenue data (last 6 months) ───────────────────────
 const CHART_DATA = [
-  { month: "Sep", revenue: 3200 },
-  { month: "Oct", revenue: 4100 },
-  { month: "Nov", revenue: 3800 },
-  { month: "Dec", revenue: 6200 },
-  { month: "Jan", revenue: 7500 },
-  { month: "Feb", revenue: 12500 },
+  { month: "Sep", revenue: 3200, debt: 1800 },
+  { month: "Oct", revenue: 4100, debt: 2400 },
+  { month: "Nov", revenue: 3800, debt: 2100 },
+  { month: "Dec", revenue: 6200, debt: 3500 },
+  { month: "Jan", revenue: 7500, debt: 2900 },
+  { month: "Feb", revenue: 12500, debt: 4200 },
 ];
 
 // ── Dummy recent invoices ────────────────────────────────────
@@ -34,8 +35,12 @@ function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm">
-      <p className="text-gray-500 text-xs mb-0.5">{label}</p>
-      <p className="font-semibold text-[#229799]">₹{payload[0].value.toLocaleString("en-IN")}</p>
+      <p className="text-gray-500 text-xs mb-1">{label}</p>
+      {payload.map((entry, i) => (
+        <p key={i} className="font-semibold" style={{ color: entry.color }}>
+          {entry.name}: ₹{entry.value.toLocaleString("en-IN")}
+        </p>
+      ))}
     </div>
   );
 }
@@ -59,6 +64,10 @@ export default function RevenueChart() {
                 <stop offset="0%" stopColor="#229799" stopOpacity={0.25} />
                 <stop offset="95%" stopColor="#229799" stopOpacity={0.02} />
               </linearGradient>
+              <linearGradient id="debtGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#ef4444" stopOpacity={0.02} />
+              </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis
@@ -74,14 +83,32 @@ export default function RevenueChart() {
               tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
             />
             <Tooltip content={<CustomTooltip />} />
+            <Legend
+              verticalAlign="top"
+              align="right"
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+            />
             <Area
               type="monotone"
               dataKey="revenue"
+              name="Revenue"
               stroke="#229799"
               strokeWidth={2.5}
               fill="url(#revenueGrad)"
               dot={false}
               activeDot={{ r: 5, fill: "#229799", stroke: "#fff", strokeWidth: 2 }}
+            />
+            <Area
+              type="monotone"
+              dataKey="debt"
+              name="Total Debt"
+              stroke="#ef4444"
+              strokeWidth={2.5}
+              fill="url(#debtGrad)"
+              dot={false}
+              activeDot={{ r: 5, fill: "#ef4444", stroke: "#fff", strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>

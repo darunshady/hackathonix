@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
 import CreateInvoice from "./pages/CreateInvoice";
 import InvoicePage from "./pages/InvoicePage";
+import PaymentsPage from "./pages/PaymentsPage";
 import { startAutoSync } from "./services/syncManager";
 
 /**
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/invoices" element={<InvoicePage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/invoices/new" element={<CreateInvoice />} />
         </Route>
       </Routes>

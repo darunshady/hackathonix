@@ -53,6 +53,9 @@ export default function Navbar() {
           <NavLink to="/invoices" className={linkClass}>
             Invoices
           </NavLink>
+          <NavLink to="/payments" className={linkClass}>
+            Payments
+          </NavLink>
           <NavLink to="/invoices/new" className={linkClass}>
             New Invoice
           </NavLink>
@@ -88,6 +91,7 @@ export default function Navbar() {
         <NavLink to="/" className={linkClass} end>Dashboard</NavLink>
         <NavLink to="/customers" className={linkClass}>Customers</NavLink>
         <NavLink to="/invoices" className={linkClass}>Invoices</NavLink>
+        <NavLink to="/payments" className={linkClass}>Payments</NavLink>
         <NavLink to="/invoices/new" className={linkClass}>New Invoice</NavLink>
       </div>
     </nav>

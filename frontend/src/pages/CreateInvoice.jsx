@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import db from "../db";
 import { enqueue } from "../services/syncManager";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import InvoiceItemsCard from "../components/InvoiceItemsCard";
 import InvoiceDetailsCard from "../components/InvoiceDetailsCard";
+import TransactionTypeToggle from "../components/TransactionTypeToggle";
+import BalancePreview from "../components/BalancePreview";
 
 /**
  * Create Invoice — modern two-column layout.
@@ -13,6 +15,9 @@ import InvoiceDetailsCard from "../components/InvoiceDetailsCard";
 export default function CreateInvoice() {
   const navigate = useNavigate();
   const online = useOnlineStatus();
+
+  // ── Transaction type ─────────────────────────────────
+  const [invoiceType, setInvoiceType] = useState("selling");
 
   // ── Customer data ────────────────────────────────────
   const [customers, setCustomers] = useState([]);
@@ -24,6 +29,28 @@ export default function CreateInvoice() {
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const phone = selectedCustomer?.phone || "";
+
+  // ── Running balance for selected customer ────────────
+  const [currentBalance, setCurrentBalance] = useState(0);
+
+  useEffect(() => {
+    if (!customerId) {
+      setCurrentBalance(0);
+      return;
+    }
+    // Sum ledger entries: selling adds, buying subtracts
+    db.ledger
+      .where("customerId")
+      .equals(customerId)
+      .toArray()
+      .then((entries) => {
+        const bal = entries.reduce((sum, e) => {
+          return e.type === "selling" ? sum + e.amount : sum - e.amount;
+        }, 0);
+        setCurrentBalance(bal);
+      })
+      .catch(() => setCurrentBalance(0));
+  }, [customerId]);
 
   // ── Line items ───────────────────────────────────────
   const [items, setItems] = useState([{ name: "", qty: 1, price: 0 }]);
@@ -67,6 +94,7 @@ export default function CreateInvoice() {
     const newInvoice = {
       id: crypto.randomUUID(),
       customerId,
+      invoiceType,
       items: items.map((i) => ({
         name: i.name.trim(),
         qty: Number(i.qty),
@@ -85,6 +113,17 @@ export default function CreateInvoice() {
     };
 
     await db.invoices.add(newInvoice);
+
+    // ── Ledger entry ─────────────────────────────────
+    if (!isDraft) {
+      await db.ledger.add({
+        customerId,
+        invoiceId: newInvoice.id,
+        type: invoiceType,
+        amount: grandTotal,
+        createdAt: newInvoice.createdAt,
+      });
+    }
 
     if (!navigator.onLine) {
       await enqueue("invoice", newInvoice.id, "create");
@@ -107,7 +146,10 @@ export default function CreateInvoice() {
 
     // WhatsApp send
     if (sendWhatsApp && !isDraft && phone) {
-      const msg = `Hi ${selectedCustomer.name}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`;
+      const msg =
+        invoiceType === "selling"
+          ? `Hi ${selectedCustomer.name}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`
+          : `Hi ${selectedCustomer.name}, we have recorded a purchase of ₹${grandTotal.toLocaleString("en-IN")}. Thank you!`;
       window.open(`https://wa.me/91${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
     }
 
@@ -121,6 +163,9 @@ export default function CreateInvoice() {
         <h1 className="text-2xl font-bold text-gray-800">Create New Invoice</h1>
         <p className="text-sm text-gray-400 mt-0.5">Fill in the details to generate a new invoice.</p>
       </div>
+
+      {/* ── Transaction Type Toggle ─────────────── */}
+      <TransactionTypeToggle value={invoiceType} onChange={setInvoiceType} />
 
       {/* ── Two-column grid ─────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -140,7 +185,7 @@ export default function CreateInvoice() {
         </div>
 
         {/* Right — Details */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-5">
           <InvoiceDetailsCard
             customers={customers}
             customerId={customerId}
@@ -156,7 +201,18 @@ export default function CreateInvoice() {
             notes={notes}
             onNotesChange={setNotes}
             syncLabel={syncLabel}
+            partyLabel={invoiceType === "selling" ? "Customer" : "Supplier"}
           />
+
+          {/* Balance preview — only when a customer is selected */}
+          {customerId && grandTotal > 0 && (
+            <BalancePreview
+              currentBalance={currentBalance}
+              transactionAmt={grandTotal}
+              invoiceType={invoiceType}
+              partyName={selectedCustomer?.name}
+            />
+          )}
         </div>
       </div>
 

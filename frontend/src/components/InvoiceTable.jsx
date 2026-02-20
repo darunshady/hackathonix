@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 /* ── Tabs ──────────────────────────────────────────────── */
-const TABS = ["All", "Paid", "Pending", "Overdue"];
+const TABS = ["All", "Paid", "Partial", "Pending", "Overdue"];
 
 /* ── Status / Sync badge styles ────────────────────────── */
 const STATUS_BADGE = {
-  paid: "bg-green-100 text-green-600",
-  pending: "bg-amber-100 text-amber-600",
+  paid:    "bg-green-100 text-green-600",
+  partial: "bg-amber-100 text-amber-600",
+  pending: "bg-gray-100 text-gray-600",
   overdue: "bg-red-100 text-red-600",
 };
 
@@ -36,6 +37,12 @@ const CheckIcon = () => (
   </svg>
 );
 
+const CurrencyIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+);
+
 /**
  * InvoiceTable — tabbed, responsive table with status badges and actions.
  *
@@ -44,7 +51,7 @@ const CheckIcon = () => (
  *   onMarkPaid   — (id) => void
  *   onResendWA   — (id) => void
  */
-export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA }) {
+export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, onRecordPayment }) {
   const [activeTab, setActiveTab] = useState("All");
 
   /* ── Filter by tab ───────────────────────────── */
@@ -152,13 +159,26 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA }) 
                         <EyeIcon />
                       </Link>
 
+                      {/* Record Payment */}
+                      {inv.paymentStatus !== "paid" && (
+                        <button
+                          onClick={() => onRecordPayment?.(inv)}
+                          title="Record Payment"
+                          className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg
+                                     bg-[#229799] text-white hover:bg-[#1b7f81] transition-colors"
+                        >
+                          <CurrencyIcon />
+                          Pay
+                        </button>
+                      )}
+
                       {/* Mark as Paid */}
                       {inv.paymentStatus !== "paid" && (
                         <button
                           onClick={() => onMarkPaid?.(inv.id)}
                           title="Mark as Paid"
                           className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg
-                                     bg-[#229799] text-white hover:bg-[#1b7f81] transition-colors"
+                                     border border-[#229799] text-[#229799] hover:bg-cyan-50 transition-colors"
                         >
                           <CheckIcon />
                           Paid

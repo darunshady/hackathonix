@@ -18,6 +18,7 @@
  *   onNotesChange   — (value) => void
  *   online          — boolean
  *   syncLabel       — "Online" | "Offline" | "Pending Sync"
+ *   partyLabel      — "Customer" | "Supplier" (dynamic label for dropdown)
  */
 
 /* ── Badge style map ───────────────────────────────────── */
@@ -55,6 +56,7 @@ export default function InvoiceDetailsCard({
   notes,
   onNotesChange,
   syncLabel = "Online",
+  partyLabel = "Customer",
 }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5 h-fit">
@@ -62,14 +64,14 @@ export default function InvoiceDetailsCard({
 
       {/* ── Customer dropdown ──────────────────── */}
       <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-600">Customer</label>
+        <label className="text-sm font-medium text-gray-600">{partyLabel}</label>
         <select
           value={customerId}
           onChange={(e) => onCustomerChange(e.target.value)}
           className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
                      focus:outline-none focus:ring-2 focus:ring-[#229799]/30 focus:border-[#229799] transition-shadow"
         >
-          <option value="">Select a customer…</option>
+          <option value="">Select a {partyLabel.toLowerCase()}…</option>
           {customers.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

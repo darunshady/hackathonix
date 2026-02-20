@@ -20,4 +20,27 @@ db.version(1).stores({
   syncQueue: "++queueId, type, recordId, action, createdAt",
 });
 
+db.version(2).stores({
+  customers: "id, name, phone, synced",
+  invoices: "id, customerId, status, synced, invoiceType",
+
+  // ── Ledger for double-entry balance tracking ─
+  // Each invoice creates a ledger entry recording the
+  // balance change for a customer/supplier.
+  ledger: "++id, customerId, invoiceId, type, amount, createdAt",
+
+  syncQueue: "++queueId, type, recordId, action, createdAt",
+});
+
+db.version(3).stores({
+  customers: "id, name, phone, synced",
+  invoices: "id, customerId, status, synced, invoiceType",
+  ledger: "++id, customerId, invoiceId, type, amount, createdAt",
+
+  // ── Payments table ───────────────────────────
+  payments: "id, customerId, invoiceId, method, date, synced",
+
+  syncQueue: "++queueId, type, recordId, action, createdAt",
+});
+
 export default db;

@@ -3,7 +3,7 @@ import { useState } from "react";
 /**
  * CustomerCard — Individual customer card for the grid.
  *
- * Shows name, location/address, phone, email, status badge,
+ * Shows name, location/address, phone, status badge,
  * and amount owed in ₹. No avatar/profile image used.
  *
  * @param {object}   customer          – Customer data object
@@ -88,14 +88,6 @@ export default function CustomerCard({
           <p className="text-gray-700 font-medium">{customer.phone || "—"}</p>
         </div>
 
-        {/* Email */}
-        <div className="min-w-0">
-          <p className="text-xs text-gray-400 mb-0.5">Email</p>
-          <p className="text-gray-700 font-medium truncate">
-            {customer.email || "—"}
-          </p>
-        </div>
-
         {/* Status */}
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Status</p>
@@ -110,12 +102,29 @@ export default function CustomerCard({
           </span>
         </div>
 
-        {/* Amount Owed */}
+        {/* Amount Owed (Net) */}
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Amount Owed</p>
-          <p className="text-amber-600 font-bold text-base">
-            ₹{(customer.amountOwed ?? 0).toLocaleString("en-IN")}
-          </p>
+          {(() => {
+            const owed = customer.amountOwed ?? 0;
+            const debt = customer.sellerDebt ?? 0;
+            const net = owed - debt;
+            const isNegative = net < 0;
+            return (
+              <>
+                <p className={`font-bold text-base ${
+                  isNegative ? "text-red-600" : "text-amber-600"
+                }`}>
+                  {isNegative ? "-" : ""}₹{Math.abs(net).toLocaleString("en-IN")}
+                </p>
+                {debt > 0 && (
+                  <span className="text-[10px] text-gray-400 leading-tight" title={`Seller Debt: ₹${debt.toLocaleString("en-IN")}`}>
+                    Debt Adjusted
+                  </span>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
