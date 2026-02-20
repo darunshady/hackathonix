@@ -29,6 +29,11 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       required: [true, "Customer reference is required"],
     },
+    invoiceType: {
+      type: String,
+      enum: ["selling", "buying"],
+      default: "selling",
+    },
     items: {
       type: [invoiceItemSchema],
       validate: [(v) => v.length > 0, "At least one item is required"],
@@ -38,14 +43,38 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    taxPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    balanceDue: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     status: {
       type: String,
-      enum: ["pending", "paid"],
+      enum: ["pending", "paid", "partial", "draft", "overdue"],
       default: "pending",
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
     },
     synced: {
       type: Boolean,
       default: true,
+    },
+    whatsappSent: {
+      type: Boolean,
+      default: false,
     },
   },
   {

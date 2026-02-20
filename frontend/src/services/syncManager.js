@@ -42,9 +42,9 @@ export async function getPendingQueue() {
 // ────────────────────────────────────────────────────────────────
 
 /**
- * Push all un-synced customers & invoices to the backend via
- * the bulk `/api/sync` endpoint, then clear the local queue
- * and mark records as synced.
+ * Push all un-synced customers, invoices, ledger entries, and payments
+ * to the backend via the bulk `/api/sync` endpoint, then clear the
+ * local queue and mark records as synced.
  *
  * @returns {{ ok: boolean, synced: object, errors: array }}
  */
@@ -53,8 +53,27 @@ export async function syncNow() {
   const unsyncedCustomers = await db.customers.where("synced").equals(0).toArray();
   const unsyncedInvoices = await db.invoices.where("synced").equals(0).toArray();
 
-  if (unsyncedCustomers.length === 0 && unsyncedInvoices.length === 0) {
-    return { ok: true, synced: { customers: 0, invoices: 0 }, errors: [] };
+  // Ledger entries: the auto-increment id won't have a synced index,
+  // so we grab all and filter; for the sync payload we need a clientId.
+  const allLedger = await db.ledger.toArray();
+  const unsyncedLedger = allLedger.filter((e) => !e.synced);
+
+  // Payments
+  let unsyncedPayments = [];
+  try {
+    unsyncedPayments = await db.payments.where("synced").equals(0).toArray();
+  } catch {
+    // payments table may not exist on older schema versions
+  }
+
+  const nothingToSync =
+    unsyncedCustomers.length === 0 &&
+    unsyncedInvoices.length === 0 &&
+    unsyncedLedger.length === 0 &&
+    unsyncedPayments.length === 0;
+
+  if (nothingToSync) {
+    return { ok: true, synced: { customers: 0, invoices: 0, ledger: 0, payments: 0 }, errors: [] };
   }
 
   try {
@@ -65,13 +84,40 @@ export async function syncNow() {
         name: c.name,
         phone: c.phone,
         address: c.address,
+        balance: c.balance || 0,
+        status: (c.status || "active").toLowerCase(),
       })),
       invoices: unsyncedInvoices.map((inv) => ({
         clientId: inv.id,
         customerId: inv.customerId,
+        invoiceType: inv.invoiceType || "selling",
         items: inv.items,
         total: inv.total,
+        taxPercent: inv.taxPercent || 0,
+        amountPaid: inv.amountPaid || 0,
+        balanceDue: inv.balanceDue || 0,
         status: inv.status,
+        notes: inv.notes || "",
+        whatsappSent: inv.whatsappSent || false,
+      })),
+      ledger: unsyncedLedger.map((e) => ({
+        clientId: e.clientId || `ledger-${e.id}-${Date.now()}`,
+        customerId: e.customerId,
+        type: e.type,
+        amount: e.amount,
+        description: e.description || "",
+        source: e.source || "invoice",
+        invoiceId: e.invoiceId || null,
+      })),
+      payments: unsyncedPayments.map((p) => ({
+        clientId: p.id,
+        customerId: p.customerId,
+        customerName: p.customerName || "",
+        invoiceId: p.invoiceId || null,
+        amount: p.amount,
+        method: p.method || "Cash",
+        note: p.note || "",
+        date: p.date,
       })),
     };
 
@@ -84,6 +130,12 @@ export async function syncNow() {
     await Promise.all(
       unsyncedInvoices.map((inv) => db.invoices.update(inv.id, { synced: 1 }))
     );
+    await Promise.all(
+      unsyncedLedger.map((e) => db.ledger.update(e.id, { synced: 1 }))
+    );
+    await Promise.all(
+      unsyncedPayments.map((p) => db.payments.update(p.id, { synced: 1 }))
+    );
 
     // Clear the queue
     await db.syncQueue.clear();
@@ -91,7 +143,7 @@ export async function syncNow() {
     return { ok: true, synced: data.synced, errors: data.errors };
   } catch (err) {
     console.error("[SyncManager] sync failed:", err);
-    return { ok: false, synced: { customers: 0, invoices: 0 }, errors: [err.message] };
+    return { ok: false, synced: { customers: 0, invoices: 0, ledger: 0, payments: 0 }, errors: [err.message] };
   }
 }
 

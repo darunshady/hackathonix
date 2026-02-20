@@ -35,7 +35,7 @@ db.version(2).stores({
 db.version(3).stores({
   customers: "id, name, phone, synced",
   invoices: "id, customerId, status, synced, invoiceType",
-  ledger: "++id, customerId, invoiceId, type, amount, createdAt",
+  ledger: "++id, customerId, invoiceId, type, amount, synced, createdAt",
 
   // ── Payments table ───────────────────────────
   payments: "id, customerId, invoiceId, method, date, synced",

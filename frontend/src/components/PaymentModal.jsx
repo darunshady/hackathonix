@@ -101,11 +101,13 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
 
       // 2. Create ledger entry (customer paying → debit = reduces what they owe)
       await db.ledger.add({
+        clientId: `ledger-pay-${payment.id}`,
         customerId,
         invoiceId: invoiceId || null,
         type: "debit",
         amount: Number(amount),
         source: "payment",
+        synced: 0,
         createdAt: now,
       });
 

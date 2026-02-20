@@ -7,12 +7,18 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["invoice", "crm", "offline-first", "nanobiz"],
+  "keywords": [
+    "invoice",
+    "crm",
+    "offline-first",
+    "nanobiz"
+  ],
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "mongodb": "^7.1.0",
     "mongoose": "^8.9.5"
   },
   "devDependencies": {

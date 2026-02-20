@@ -1,31 +1,9 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import db from "../db";
 import StatCard from "../components/StatCard";
 import InvoiceTable from "../components/InvoiceTable";
 import RecordPaymentModal from "../components/RecordPaymentModal";
-
-/* ═══════════════════════════════════════════════════════════
-   DUMMY DATA — replace with real DB / API calls later
-   ═══════════════════════════════════════════════════════════ */
-
-const DUMMY_INVOICES = [
-  { id: "INV-001", customerName: "Ramesh Kumar",    phone: "9876543210", date: "2026-02-18", amount: 4500,  amountPaid: 4500, paymentStatus: "paid",    syncStatus: "synced"  },
-  { id: "INV-002", customerName: "Priya Sharma",    phone: "9123456789", date: "2026-02-17", amount: 1200,  amountPaid: 500,  paymentStatus: "partial", syncStatus: "pending" },
-  { id: "INV-003", customerName: "Anil Verma",      phone: "9988776655", date: "2026-02-15", amount: 7800,  amountPaid: 0,    paymentStatus: "overdue", syncStatus: "synced"  },
-  { id: "INV-004", customerName: "Sneha Patel",     phone: "9012345678", date: "2026-02-14", amount: 3200,  amountPaid: 3200, paymentStatus: "paid",    syncStatus: "synced"  },
-  { id: "INV-005", customerName: "Vikram Singh",    phone: "9871234560", date: "2026-02-13", amount: 5600,  amountPaid: 2000, paymentStatus: "partial", syncStatus: "pending" },
-  { id: "INV-006", customerName: "Meena Gupta",     phone: "9765432100", date: "2026-02-12", amount: 2100,  amountPaid: 2100, paymentStatus: "paid",    syncStatus: "synced"  },
-  { id: "INV-007", customerName: "Suresh Reddy",    phone: "9654321098", date: "2026-02-10", amount: 9400,  amountPaid: 0,    paymentStatus: "overdue", syncStatus: "synced"  },
-  { id: "INV-008", customerName: "Kavita Nair",     phone: "9543210987", date: "2026-02-08", amount: 1850,  amountPaid: 0,    paymentStatus: "pending", syncStatus: "pending" },
-  { id: "INV-009", customerName: "Deepak Joshi",    phone: "9432109876", date: "2026-02-06", amount: 6300,  amountPaid: 6300, paymentStatus: "paid",    syncStatus: "synced"  },
-  { id: "INV-010", customerName: "Anjali Mishra",   phone: "9321098765", date: "2026-02-04", amount: 4100,  amountPaid: 0,    paymentStatus: "pending", syncStatus: "pending" },
-];
-
-/* ── KPI helpers ───────────────────────────────────────── */
-const totalSales    = DUMMY_INVOICES.reduce((s, i) => s + i.amount, 0);
-const totalPending  = DUMMY_INVOICES.filter((i) => i.paymentStatus !== "paid").reduce((s, i) => s + i.amount, 0);
-const totalCustomers = new Set(DUMMY_INVOICES.map((i) => i.phone)).size;
-const totalInvoices  = DUMMY_INVOICES.length;
 
 /* ── Inline SVG icons for KPI cards ────────────────────── */
 const SalesIcon = () => (
@@ -60,18 +38,54 @@ const PlusIcon = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════
-   InvoicePage — main Invoices screen
+   InvoicePage — main Invoices screen (reads from IndexedDB)
    ═══════════════════════════════════════════════════════════ */
 export default function InvoicePage() {
-  const [invoices, setInvoices] = useState(DUMMY_INVOICES);
+  const [invoices, setInvoices] = useState([]);
+
+  /* ── Load invoices from IndexedDB ───────────── */
+  const loadInvoices = useCallback(async () => {
+    const allInvoices = await db.invoices.toArray();
+    const allCustomers = await db.customers.toArray();
+    const customerMap = Object.fromEntries(allCustomers.map((c) => [c.id, c]));
+
+    // Map to the shape InvoiceTable expects
+    const mapped = allInvoices.map((inv) => {
+      const cust = customerMap[inv.customerId];
+      return {
+        id: inv.id,
+        customerName: cust?.name || "Unknown",
+        phone: cust?.phone || "",
+        date: inv.createdAt ? inv.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        amount: inv.total || 0,
+        amountPaid: inv.amountPaid || 0,
+        paymentStatus: inv.status || "pending",
+        syncStatus: inv.synced ? "synced" : "pending",
+      };
+    });
+
+    // Sort newest first
+    mapped.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    setInvoices(mapped);
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
 
   /* ── Actions ────────────────────────────────── */
-  const handleMarkPaid = (id) => {
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === id ? { ...inv, paymentStatus: "paid", syncStatus: "pending" } : inv
-      )
-    );
+  const handleMarkPaid = async (id) => {
+    // Update IndexedDB
+    const inv = await db.invoices.get(id);
+    if (inv) {
+      await db.invoices.update(id, {
+        status: "paid",
+        amountPaid: inv.total || 0,
+        balanceDue: 0,
+        synced: 0,
+      });
+    }
+    loadInvoices();
   };
 
   const handleResendWA = (id) => {
@@ -95,7 +109,7 @@ export default function InvoicePage() {
     setPaymentInvoice(invoice);
   };
 
-  const handleSavePayment = (paymentData) => {
+  const handleSavePayment = async (paymentData) => {
     const newPayment = {
       id: `PAY-${String(paymentCounter).padStart(3, "0")}`,
       ...paymentData,
@@ -103,21 +117,41 @@ export default function InvoicePage() {
     setPayments((prev) => [newPayment, ...prev]);
     setPaymentCounter((c) => c + 1);
 
-    // Update the invoice
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id !== paymentData.invoiceId) return inv;
-        const newPaid = (inv.amountPaid ?? 0) + paymentData.amount;
-        const remaining = inv.amount - newPaid;
-        return {
-          ...inv,
-          amountPaid: newPaid,
-          paymentStatus: remaining <= 0 ? "paid" : "partial",
-          syncStatus: "pending",
-        };
-      })
-    );
+    // Update the invoice in IndexedDB
+    const inv = await db.invoices.get(paymentData.invoiceId);
+    if (inv) {
+      const newPaid = (inv.amountPaid || 0) + paymentData.amount;
+      const newBalance = Math.max(0, (inv.total || 0) - newPaid);
+      const newStatus = newBalance <= 0 ? "paid" : "partial";
+      await db.invoices.update(paymentData.invoiceId, {
+        amountPaid: newPaid,
+        balanceDue: newBalance,
+        status: newStatus,
+        synced: 0,
+      });
+    }
+
+    // Also save to payments table
+    try {
+      await db.payments.add({
+        id: newPayment.id,
+        customerId: inv?.customerId || "",
+        customerName: paymentData.customerName || "",
+        invoiceId: paymentData.invoiceId,
+        amount: paymentData.amount,
+        method: paymentData.method || "Cash",
+        note: paymentData.note || "",
+        date: paymentData.date || new Date().toISOString().slice(0, 10),
+        createdAt: new Date().toISOString(),
+        synced: 0,
+      });
+    } catch (e) {
+      console.warn("Could not save payment to DB:", e);
+    }
+
     setPaymentInvoice(null);
+    // Reload invoices to reflect updated amounts
+    loadInvoices();
   };
 
   /* ── Search & date filter state ──────────────── */

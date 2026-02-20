@@ -117,10 +117,13 @@ export default function CreateInvoice() {
     // ── Ledger entry ─────────────────────────────────
     if (!isDraft) {
       await db.ledger.add({
+        clientId: `ledger-${newInvoice.id}`,
         customerId,
         invoiceId: newInvoice.id,
         type: invoiceType,
         amount: grandTotal,
+        source: "invoice",
+        synced: 0,
         createdAt: newInvoice.createdAt,
       });
     }

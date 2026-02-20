@@ -29,6 +29,15 @@ const customerSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    balance: {
+      type: Number,
+      default: 0,
+    },
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
   },
   {
     timestamps: true, // auto createdAt & updatedAt
