@@ -44,10 +44,10 @@ export default function InvoiceList() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Invoices</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Invoices</h1>
 
       {invoices.length === 0 ? (
-        <p className="text-slate-400 text-sm">
+        <p className="text-gray-400 text-sm">
           No invoices yet.{" "}
           <a href="/invoices/new" className="text-indigo-400 hover:underline">
             Create one →
@@ -60,12 +60,12 @@ export default function InvoiceList() {
             return (
               <div
                 key={inv.id}
-                className="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow"
               >
                 {/* ── Info ──────────────────────── */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold truncate">
+                    <h3 className="font-semibold text-gray-800 truncate">
                       {customer ? customer.name : "Unknown Customer"}
                     </h3>
                     <span
@@ -81,12 +81,12 @@ export default function InvoiceList() {
                       <span className="text-xs text-red-400 font-medium">⏳ Not synced</span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-gray-500">
                     {inv.items.length} item{inv.items.length !== 1 ? "s" : ""} ·{" "}
-                    <span className="text-white font-medium">₹{inv.total.toLocaleString()}</span>{" "}
+                    <span className="text-gray-800 font-medium">₹{inv.total.toLocaleString()}</span>{" "}
                     · {new Date(inv.createdAt).toLocaleDateString()}
                   </p>
-                  <ul className="mt-2 text-xs text-slate-500 space-y-0.5">
+                  <ul className="mt-2 text-xs text-gray-400 space-y-0.5">
                     {inv.items.map((item, i) => (
                       <li key={i}>
                         {item.name} × {item.qty} @ ₹{item.price}

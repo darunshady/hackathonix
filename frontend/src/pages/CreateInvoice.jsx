@@ -86,7 +86,7 @@ export default function CreateInvoice() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Create Invoice</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Create Invoice</h1>
         <button
           type="button"
           onClick={handleVoiceInput}
@@ -99,17 +99,17 @@ export default function CreateInvoice() {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-6"
+        className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-6"
       >
         {/* ── Customer select ──────────────── */}
         <div>
-          <label className="block text-sm text-slate-400 mb-1">Customer *</label>
+          <label className="block text-sm text-gray-500 mb-1">Customer *</label>
           <select
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value)}
             required
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-[#229799]/40 focus:border-[#229799]"
           >
             <option value="">Select a customer…</option>
             {customers.map((c) => (
@@ -122,7 +122,7 @@ export default function CreateInvoice() {
 
         {/* ── Line items ───────────────────── */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Items</label>
+          <label className="block text-sm text-gray-500 mb-2">Items</label>
           <div className="space-y-2">
             {items.map((item, idx) => (
               <div key={idx} className="grid grid-cols-12 gap-2 items-center">
@@ -131,8 +131,8 @@ export default function CreateInvoice() {
                   placeholder="Item name"
                   value={item.name}
                   onChange={(e) => updateItem(idx, "name", e.target.value)}
-                  className="col-span-5 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm
-                             placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="col-span-5 border border-gray-300 rounded-lg px-3 py-2 text-sm
+                             placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#229799]/40 focus:border-[#229799]"
                 />
                 <input
                   type="number"
@@ -140,8 +140,8 @@ export default function CreateInvoice() {
                   placeholder="Qty"
                   value={item.qty}
                   onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                  className="col-span-2 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-[#229799]/40 focus:border-[#229799]"
                 />
                 <input
                   type="number"
@@ -150,13 +150,13 @@ export default function CreateInvoice() {
                   placeholder="Price"
                   value={item.price}
                   onChange={(e) => updateItem(idx, "price", e.target.value)}
-                  className="col-span-3 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-[#229799]/40 focus:border-[#229799]"
                 />
                 <button
                   type="button"
                   onClick={() => removeItem(idx)}
-                  className="col-span-2 text-red-400 hover:text-red-300 text-sm font-medium"
+                  className="col-span-2 text-red-500 hover:text-red-600 text-sm font-medium"
                 >
                   ✕ Remove
                 </button>
@@ -166,20 +166,20 @@ export default function CreateInvoice() {
           <button
             type="button"
             onClick={addItem}
-            className="mt-3 text-indigo-400 hover:text-indigo-300 text-sm font-medium"
+            className="mt-3 text-[#229799] hover:text-[#1b7f81] text-sm font-medium"
           >
             + Add Item
           </button>
         </div>
 
         {/* ── Total + submit ───────────────── */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-700">
-          <p className="text-lg font-bold">
-            Total: <span className="text-emerald-400">₹{total.toLocaleString()}</span>
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <p className="text-lg font-bold text-gray-800">
+            Total: <span className="text-[#229799]">₹{total.toLocaleString()}</span>
           </p>
           <button
             type="submit"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-6 py-2.5 text-sm font-medium transition-colors"
+            className="bg-[#229799] hover:bg-[#1b7f81] text-white rounded-lg px-6 py-2.5 text-sm font-medium transition-colors"
           >
             Save Invoice
           </button>
