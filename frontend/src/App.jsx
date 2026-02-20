@@ -4,7 +4,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
 import CreateInvoice from "./pages/CreateInvoice";
-import InvoiceList from "./pages/InvoiceList";
+import InvoicePage from "./pages/InvoicePage";
 import { startAutoSync } from "./services/syncManager";
 
 /**
@@ -27,7 +27,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/customers" element={<Customers />} />
-          <Route path="/invoices" element={<InvoiceList />} />
+          <Route path="/invoices" element={<InvoicePage />} />
           <Route path="/invoices/new" element={<CreateInvoice />} />
         </Route>
       </Routes>
