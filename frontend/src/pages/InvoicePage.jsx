@@ -78,26 +78,62 @@ export default function InvoicePage() {
     // Update IndexedDB
     const inv = await db.invoices.get(id);
     if (inv) {
+      const remainingBalance = (inv.total || 0) - (inv.amountPaid || 0);
+
       await db.invoices.update(id, {
         status: "paid",
         amountPaid: inv.total || 0,
         balanceDue: 0,
         synced: 0,
       });
+
+      // Create ledger entry for the remaining amount being paid
+      if (remainingBalance > 0) {
+        const now = new Date().toISOString();
+        await db.ledger.add({
+          clientId: `ledger-markpaid-${id}-${Date.now()}`,
+          customerId: inv.customerId || "",
+          invoiceId: id,
+          type: "debit",
+          amount: remainingBalance,
+          source: "payment",
+          synced: 0,
+          createdAt: now,
+        });
+
+        // Update cached customer balance
+        if (inv.customerId) {
+          const cust = await db.customers.get(inv.customerId);
+          if (cust) {
+            const newOwed = Math.max(0, (cust.amountOwed || 0) - remainingBalance);
+            await db.customers.update(inv.customerId, { amountOwed: newOwed, synced: 0 });
+          }
+        }
+      }
     }
     loadInvoices();
   };
 
-  const handleResendWA = (id) => {
+  const handleResendWA = async (id) => {
     const inv = invoices.find((i) => i.id === id);
-    if (inv) {
-      window.open(
-        `https://wa.me/91${inv.phone}?text=${encodeURIComponent(
-          `Hi ${inv.customerName}, your invoice ${inv.id} for ₹${inv.amount} is ${inv.paymentStatus}. Thank you!`
-        )}`,
-        "_blank"
-      );
+    if (!inv) return;
+
+    // Guard: must be synced first
+    if (inv.syncStatus !== "synced") {
+      alert("Please sync this invoice before sending via WhatsApp.");
+      return;
     }
+
+    window.open(
+      `https://wa.me/91${inv.phone}?text=${encodeURIComponent(
+        `Hi ${inv.customerName}, your invoice ${inv.id} for ₹${inv.amount} is ${inv.paymentStatus}. Thank you!`
+      )}`,
+      "_blank"
+    );
+
+    // Mark whatsappSent flag
+    await db.invoices.update(id, { whatsappSent: true });
+    loadInvoices();
   };
 
   /* ── Payment state ──────────────────────────── */
@@ -129,6 +165,28 @@ export default function InvoicePage() {
         status: newStatus,
         synced: 0,
       });
+
+      // ── Create ledger entry (debit — reduces what customer owes) ──
+      const now = new Date().toISOString();
+      await db.ledger.add({
+        clientId: `ledger-pay-${newPayment.id}`,
+        customerId: inv.customerId || "",
+        invoiceId: paymentData.invoiceId,
+        type: "debit",
+        amount: paymentData.amount,
+        source: "payment",
+        synced: 0,
+        createdAt: now,
+      });
+
+      // ── Update cached customer balance ────────────────────────────
+      if (inv.customerId) {
+        const cust = await db.customers.get(inv.customerId);
+        if (cust) {
+          const newOwed = Math.max(0, (cust.amountOwed || 0) - paymentData.amount);
+          await db.customers.update(inv.customerId, { amountOwed: newOwed, synced: 0 });
+        }
+      }
     }
 
     // Also save to payments table

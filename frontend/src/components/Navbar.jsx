@@ -16,9 +16,13 @@ export default function Navbar() {
     try {
       const result = await syncNow();
       if (result.ok) {
-        alert(
-          `Synced ${result.synced.customers} customers & ${result.synced.invoices} invoices`
-        );
+        const s = result.synced;
+        const parts = [];
+        if (s.customers) parts.push(`${s.customers} customer(s)`);
+        if (s.invoices) parts.push(`${s.invoices} invoice(s)`);
+        if (s.ledger) parts.push(`${s.ledger} ledger entr(ies)`);
+        if (s.payments) parts.push(`${s.payments} payment(s)`);
+        alert(parts.length ? `Synced: ${parts.join(", ")}` : "Everything is up to date!");
       } else {
         alert("Sync failed — will retry when online.");
       }

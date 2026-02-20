@@ -141,11 +141,16 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, on
                   {/* Actions */}
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
-                      {/* WhatsApp resend */}
+                      {/* WhatsApp resend — disabled if not synced */}
                       <button
                         onClick={() => onResendWA?.(inv.id)}
-                        title="Resend via WhatsApp"
-                        className="p-2 rounded-lg text-green-600 hover:bg-green-50 transition-colors"
+                        title={inv.syncStatus === "synced" ? "Resend via WhatsApp" : "Sync first to send via WhatsApp"}
+                        disabled={inv.syncStatus !== "synced"}
+                        className={`p-2 rounded-lg transition-colors ${
+                          inv.syncStatus === "synced"
+                            ? "text-green-600 hover:bg-green-50"
+                            : "text-gray-300 cursor-not-allowed"
+                        }`}
                       >
                         <WhatsAppIcon />
                       </button>

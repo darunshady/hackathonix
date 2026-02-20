@@ -148,7 +148,14 @@ export default function Customers() {
   // ── Create customer (offline-first) ────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) return alert("Customer name is required.");
+    if (!form.phone.trim()) return alert("Phone number is required.");
+
+    // Check for duplicate phone
+    const existing = await db.customers.toArray();
+    if (existing.some((c) => c.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""))) {
+      return alert("A customer with this phone number already exists.");
+    }
 
     const newCustomer = {
       id: crypto.randomUUID(),

@@ -126,6 +126,13 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
         }
       }
 
+      // 3b. Update cached customer balance (payment reduces what they owe)
+      const cust = await db.customers.get(customerId);
+      if (cust) {
+        const newOwed = Math.max(0, (cust.amountOwed || 0) - Number(amount));
+        await db.customers.update(customerId, { amountOwed: newOwed, synced: 0 });
+      }
+
       // 4. Queue for sync
       await db.syncQueue.add({
         type: "payment",

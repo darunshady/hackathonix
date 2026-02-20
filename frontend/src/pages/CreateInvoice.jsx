@@ -90,6 +90,9 @@ export default function CreateInvoice() {
   const saveInvoice = async (isDraft = false) => {
     if (!customerId) return alert("Please select a customer");
     if (items.some((i) => !i.name.trim())) return alert("All items need a name");
+    if (items.some((i) => Number(i.qty) <= 0)) return alert("All items must have quantity greater than 0");
+    if (items.some((i) => Number(i.price) <= 0)) return alert("All items must have a price greater than 0");
+    if (grandTotal <= 0) return alert("Invoice total must be greater than 0");
 
     const newInvoice = {
       id: crypto.randomUUID(),
@@ -126,6 +129,21 @@ export default function CreateInvoice() {
         synced: 0,
         createdAt: newInvoice.createdAt,
       });
+
+      // ── Update cached customer balance ───────────
+      const cust = await db.customers.get(customerId);
+      if (cust) {
+        const currentOwed = cust.amountOwed || 0;
+        const newOwed = invoiceType === "selling"
+          ? currentOwed + grandTotal
+          : Math.max(0, currentOwed - grandTotal);
+        await db.customers.update(customerId, {
+          amountOwed: newOwed,
+          hasPendingInvoice: true,
+          lastInvoiceDate: newInvoice.createdAt.slice(0, 10),
+          synced: 0,
+        });
+      }
     }
 
     if (!navigator.onLine) {
@@ -147,13 +165,19 @@ export default function CreateInvoice() {
       }
     }
 
-    // WhatsApp send
+    // WhatsApp send — only if synced (online at creation)
     if (sendWhatsApp && !isDraft && phone) {
-      const msg =
-        invoiceType === "selling"
-          ? `Hi ${selectedCustomer.name}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`
-          : `Hi ${selectedCustomer.name}, we have recorded a purchase of ₹${grandTotal.toLocaleString("en-IN")}. Thank you!`;
-      window.open(`https://wa.me/91${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+      if (!navigator.onLine) {
+        // Queued: will auto-send after next sync
+        await db.invoices.update(newInvoice.id, { whatsappPending: true });
+      } else {
+        const msg =
+          invoiceType === "selling"
+            ? `Hi ${selectedCustomer.name}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`
+            : `Hi ${selectedCustomer.name}, we have recorded a purchase of ₹${grandTotal.toLocaleString("en-IN")}. Thank you!`;
+        window.open(`https://wa.me/91${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+        await db.invoices.update(newInvoice.id, { whatsappSent: true });
+      }
     }
 
     navigate("/invoices");
