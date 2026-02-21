@@ -145,36 +145,49 @@ export default function Customers() {
     setFilterPending("All");
   };
 
-  // ── Create customer (offline-first) ────────────────────────────────
+  // ── Create customer (offline-first, optimistic UI) ───────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) return alert("Customer name is required.");
-    if (!form.phone.trim()) return alert("Phone number is required.");
+    const name = form.name.trim();
+    const phone = form.phone.trim();
 
-    // Check for duplicate phone
+    if (!name) return alert("Customer name is required.");
+    if (!phone) return alert("Phone number is required.");
+
+    // Duplicate phone check
     const existing = await db.customers.toArray();
-    if (existing.some((c) => c.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""))) {
+    if (existing.some((c) => (c.phone || "").replace(/\D/g, "") === phone.replace(/\D/g, ""))) {
       return alert("A customer with this phone number already exists.");
     }
 
     const newCustomer = {
       id: crypto.randomUUID(),
-      name: form.name.trim(),
-      phone: form.phone.trim(),
+      name,
+      phone,
       address: form.address.trim(),
       status: "Active",
       amountOwed: Number(form.amountOwed) || 0,
       sellerDebt: Number(form.sellerDebt) || 0,
-      synced: navigator.onLine ? 1 : 0,
+      synced: 0,
       createdAt: new Date().toISOString(),
     };
 
-    await db.customers.add(newCustomer);
+    // ── Step 1: Save locally — this must never fail ──────────────────────────
+    try {
+      await db.customers.add(newCustomer);
+    } catch (err) {
+      console.error("IndexedDB save failed:", err);
+      return alert("Could not save customer locally: " + err.message);
+    }
 
-    if (!navigator.onLine) {
-      await enqueue("customer", newCustomer.id, "create");
-    } else {
-      try {
+    // ── Step 2: Optimistic UI — close form & refresh immediately ─────────────
+    setForm({ name: "", phone: "", address: "", amountOwed: "", sellerDebt: "" });
+    setShowForm(false);
+    loadCustomers();
+
+    // ── Step 3: Background sync — never blocks the UI ────────────────────────
+    try {
+      if (navigator.onLine) {
         const { default: api } = await import("../services/api");
         await api.post("/customers", {
           clientId: newCustomer.id,
@@ -183,15 +196,13 @@ export default function Customers() {
           address: newCustomer.address,
         });
         await db.customers.update(newCustomer.id, { synced: 1 });
-      } catch {
+      } else {
         await enqueue("customer", newCustomer.id, "create");
-        await db.customers.update(newCustomer.id, { synced: 0 });
       }
+    } catch (syncErr) {
+      console.warn("[Customer] Background sync failed, queued:", syncErr.message);
+      await enqueue("customer", newCustomer.id, "create").catch(() => {});
     }
-
-    setForm({ name: "", phone: "", address: "", amountOwed: "", sellerDebt: "" });
-    setShowForm(false);
-    loadCustomers();
   };
 
   // ── Card action callbacks ──────────────────────────────────────────

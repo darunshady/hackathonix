@@ -24,7 +24,7 @@
  * NOTE: This is a NEW file. The existing whatsapp.js is untouched.
  */
 
-import db from "../db/schema";
+import db from "../db";
 import { sendWhatsApp as serverSendWhatsApp } from "./apiService";
 
 /**
@@ -105,7 +105,7 @@ export async function sendWhatsAppIfSynced(invoice, customer) {
 
       // Open WhatsApp link if returned
       if (result.url) {
-        window.open(result.url, "_blank");
+        try { window.open(result.url, "_blank"); } catch (e) { console.error("[WhatsApp] open failed:", e); }
       }
 
       return { ok: true, message: "WhatsApp invoice sent!", url: result.url };
@@ -142,7 +142,11 @@ function generateLocalWhatsAppLink(invoice, customer) {
   const cleanPhone = customer.phone.replace(/\D/g, "");
   const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
-  window.open(url, "_blank");
+  try {
+    window.open(url, "_blank");
+  } catch (e) {
+    console.error("[WhatsApp] local fallback open failed:", e);
+  }
 
   return {
     ok: true,

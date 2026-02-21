@@ -85,6 +85,7 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, on
           <thead>
             <tr className="text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
               <th className="px-6 py-3 font-medium">Invoice ID</th>
+              <th className="px-6 py-3 font-medium">Type</th>
               <th className="px-6 py-3 font-medium">Customer Name</th>
               <th className="px-6 py-3 font-medium">Phone</th>
               <th className="px-6 py-3 font-medium">Date</th>
@@ -98,7 +99,7 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, on
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
+                <td colSpan={9} className="px-6 py-10 text-center text-gray-400">
                   No invoices found.
                 </td>
               </tr>
@@ -109,6 +110,15 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, on
                   className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors"
                 >
                   <td className="px-6 py-4 font-medium text-gray-800">{inv.id}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full ${
+                      inv.invoiceType === "buying"
+                        ? "bg-orange-100 text-orange-600"
+                        : "bg-emerald-100 text-emerald-600"
+                    }`}>
+                      {inv.invoiceType === "buying" ? "BUY" : "SELL"}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-gray-700">{inv.customerName}</td>
                   <td className="px-6 py-4 text-gray-500">{inv.phone}</td>
                   <td className="px-6 py-4 text-gray-500">{inv.date}</td>

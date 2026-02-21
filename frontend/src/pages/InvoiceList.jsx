@@ -71,20 +71,37 @@ export default function InvoiceList() {
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                         inv.status === "paid"
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-amber-500/20 text-amber-400"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : inv.status === "partial"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-amber-100 text-amber-700"
                       }`}
                     >
                       {inv.status}
                     </span>
+                    {inv.invoiceType && (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        inv.invoiceType === "selling"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-orange-100 text-orange-700"
+                      }`}>
+                        {inv.invoiceType === "selling" ? "SELL" : "BUY"}
+                      </span>
+                    )}
                     {!inv.synced && (
                       <span className="text-xs text-red-400 font-medium">⏳ Not synced</span>
                     )}
                   </div>
                   <p className="text-sm text-gray-500">
                     {inv.items.length} item{inv.items.length !== 1 ? "s" : ""} ·{" "}
-                    <span className="text-gray-800 font-medium">₹{inv.total.toLocaleString()}</span>{" "}
-                    · {new Date(inv.createdAt).toLocaleDateString()}
+                    <span className="text-gray-800 font-medium">₹{(inv.total || 0).toLocaleString()}</span>
+                    {inv.amountPaid > 0 && (
+                      <span className="text-emerald-600"> · ₹{inv.amountPaid.toLocaleString()} paid</span>
+                    )}
+                    {(inv.balanceDue || 0) > 0 && inv.status !== "paid" && (
+                      <span className="text-amber-600 font-medium"> · ₹{inv.balanceDue.toLocaleString()} due</span>
+                    )}
+                    {" "}· {new Date(inv.createdAt).toLocaleDateString()}
                   </p>
                   <ul className="mt-2 text-xs text-gray-400 space-y-0.5">
                     {inv.items.map((item, i) => (

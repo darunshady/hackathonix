@@ -23,6 +23,9 @@ const customerSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+      index: true,
+      // sparse: true allows multiple empty strings while enforcing
+      // uniqueness for non-empty phone numbers via the pre-save hook below
     },
     address: {
       type: String,
@@ -43,5 +46,19 @@ const customerSchema = new mongoose.Schema(
     timestamps: true, // auto createdAt & updatedAt
   }
 );
+
+// Enforce phone uniqueness for non-empty values (allows multiple empty strings)
+customerSchema.pre("save", async function (next) {
+  if (this.phone && this.phone.trim()) {
+    const existing = await mongoose.model("Customer").findOne({
+      phone: this.phone.trim(),
+      _id: { $ne: this._id },
+    });
+    if (existing) {
+      return next(new Error(`Phone number ${this.phone} already exists for customer "${existing.name}"`));
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model("Customer", customerSchema);

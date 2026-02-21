@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AreaChart,
   Area,
@@ -8,25 +10,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import db from "../db";
 
-// ── Dummy revenue data (last 6 months) ───────────────────────
-const CHART_DATA = [
-  { month: "Sep", revenue: 3200, debt: 1800 },
-  { month: "Oct", revenue: 4100, debt: 2400 },
-  { month: "Nov", revenue: 3800, debt: 2100 },
-  { month: "Dec", revenue: 6200, debt: 3500 },
-  { month: "Jan", revenue: 7500, debt: 2900 },
-  { month: "Feb", revenue: 12500, debt: 4200 },
-];
-
-// ── Dummy recent invoices ────────────────────────────────────
-const RECENT_INVOICES = [
-  { id: "#INV-007", customer: "Raj Patel",   date: "2024-03-10", amount: 500,  status: "Paid" },
-  { id: "#INV-006", customer: "Wei Chen",    date: "2024-03-08", amount: 300,  status: "Paid" },
-  { id: "#INV-005", customer: "Elon Mask",   date: "2024-03-05", amount: 250,  status: "Paid" },
-  { id: "#INV-004", customer: "James Brown", date: "2024-03-02", amount: 1200, status: "Pending" },
-  { id: "#INV-003", customer: "Henry Cavil", date: "2024-02-28", amount: 750,  status: "Pending" },
-];
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 /**
  * Custom Recharts tooltip with #229799 accent.
@@ -46,10 +32,73 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 /**
- * RevenueChart — Area chart showing 6-month revenue growth,
- * plus a recent-invoices mini-table underneath.
+ * RevenueChart — Area chart showing 6-month revenue growth from real data,
+ * plus a recent-invoices mini-table underneath (live from IndexedDB).
  */
 export default function RevenueChart() {
+  const [chartData, setChartData] = useState([]);
+  const [recentInvoices, setRecentInvoices] = useState([]);
+  const location = useLocation();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const allInvoices = await db.invoices.toArray();
+        const allCustomers = await db.customers.toArray();
+        const custMap = Object.fromEntries(allCustomers.map(c => [c.id, c.name]));
+
+        // Fetch standalone payments too
+        let allPayments = [];
+        try { allPayments = await db.payments.toArray(); } catch { /* table may not exist */ }
+
+        // ── Build chart data: last 6 months revenue + debt ───────────
+        const now = new Date();
+        const months = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          months.push({ year: d.getFullYear(), month: d.getMonth(), label: MONTH_LABELS[d.getMonth()] });
+        }
+
+        const chart = months.map(({ year, month, label }) => {
+          const inMonth = allInvoices.filter(inv => {
+            if (!inv.createdAt) return false;
+            const d = new Date(inv.createdAt);
+            return d.getFullYear() === year && d.getMonth() === month;
+          });
+          // Payments that fall in this month
+          const paymentsInMonth = allPayments.filter(p => {
+            if (!p.createdAt) return false;
+            const d = new Date(p.createdAt);
+            return d.getFullYear() === year && d.getMonth() === month;
+          });
+          const paymentRevenue = paymentsInMonth.reduce((s, p) => s + (p.amount || 0), 0);
+          const revenue = inMonth
+            .filter(inv => inv.invoiceType === "selling")
+            .reduce((s, inv) => s + (inv.total || 0), 0) + paymentRevenue;
+          const debt = inMonth
+            .filter(inv => inv.invoiceType === "buying" && inv.status !== "paid")
+            .reduce((s, inv) => s + (inv.balanceDue ?? Math.max(0, (inv.total || 0) - (inv.amountPaid || 0))), 0);
+          return { month: label, revenue, debt };
+        });
+        setChartData(chart);
+
+        // ── Recent invoices: last 5, newest first ────────────────────
+        const sorted = [...allInvoices]
+          .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+          .slice(0, 5)
+          .map((inv, i) => ({
+            id: `#INV-${String(allInvoices.length - i).padStart(3, "0")}`,
+            customer: custMap[inv.customerId] || "Unknown",
+            date: inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "—",
+            amount: inv.total || 0,
+            status: inv.status === "paid" ? "Paid" : inv.status === "partial" ? "Partial" : "Pending",
+          }));
+        setRecentInvoices(sorted);
+      } catch (err) {
+        console.error("RevenueChart load error:", err);
+      }
+    })();
+  }, [location.key]);
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
       {/* ── Header ────────────────────────────────── */}
@@ -58,7 +107,7 @@ export default function RevenueChart() {
       {/* ── Chart ─────────────────────────────────── */}
       <div className="w-full h-52">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={CHART_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#229799" stopOpacity={0.25} />
@@ -103,7 +152,7 @@ export default function RevenueChart() {
             <Area
               type="monotone"
               dataKey="debt"
-              name="Total Debt"
+              name="Seller's Debt"
               stroke="#ef4444"
               strokeWidth={2.5}
               fill="url(#debtGrad)"
@@ -129,7 +178,7 @@ export default function RevenueChart() {
             </tr>
           </thead>
           <tbody className="text-gray-600">
-            {RECENT_INVOICES.map((inv) => (
+            {recentInvoices.map((inv) => (
               <tr key={inv.id} className="border-b border-gray-50 last:border-0">
                 <td className="px-2 py-2 font-medium text-gray-700">{inv.id}</td>
                 <td className="px-2 py-2">{inv.customer}</td>
@@ -139,8 +188,10 @@ export default function RevenueChart() {
                   <span
                     className={`inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                       inv.status === "Paid"
-                        ? "bg-red-100 text-red-500"
-                        : "bg-amber-100 text-amber-600"
+                        ? "bg-emerald-100 text-emerald-600"
+                        : inv.status === "Partial"
+                        ? "bg-amber-100 text-amber-600"
+                        : "bg-red-100 text-red-500"
                     }`}
                   >
                     {inv.status}

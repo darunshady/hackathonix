@@ -61,6 +61,7 @@ export default function InvoicePage() {
         amountPaid: inv.amountPaid || 0,
         paymentStatus: inv.status || "pending",
         syncStatus: inv.synced ? "synced" : "pending",
+        invoiceType: inv.invoiceType || "selling",
       };
     });
 
@@ -105,8 +106,15 @@ export default function InvoicePage() {
         if (inv.customerId) {
           const cust = await db.customers.get(inv.customerId);
           if (cust) {
-            const newOwed = Math.max(0, (cust.amountOwed || 0) - remainingBalance);
-            await db.customers.update(inv.customerId, { amountOwed: newOwed, synced: 0 });
+            if (inv.invoiceType === "buying") {
+              // Buying: marking paid reduces seller's debt
+              const newDebt = Math.max(0, (cust.sellerDebt || 0) - remainingBalance);
+              await db.customers.update(inv.customerId, { sellerDebt: newDebt, synced: 0 });
+            } else {
+              // Selling: marking paid reduces what customer owes
+              const newOwed = Math.max(0, (cust.amountOwed || 0) - remainingBalance);
+              await db.customers.update(inv.customerId, { amountOwed: newOwed, synced: 0 });
+            }
           }
         }
       }
@@ -124,12 +132,18 @@ export default function InvoicePage() {
       return;
     }
 
-    window.open(
-      `https://wa.me/91${inv.phone}?text=${encodeURIComponent(
-        `Hi ${inv.customerName}, your invoice ${inv.id} for ₹${inv.amount} is ${inv.paymentStatus}. Thank you!`
-      )}`,
-      "_blank"
-    );
+    try {
+      window.open(
+        `https://wa.me/91${inv.phone}?text=${encodeURIComponent(
+          `Hi ${inv.customerName}, your invoice ${inv.id} for ₹${inv.amount} is ${inv.paymentStatus}. Thank you!`
+        )}`,
+        "_blank"
+      );
+    } catch (e) {
+      console.error("[InvoicePage] WhatsApp open failed:", e);
+      alert("Could not open WhatsApp. Please try again.");
+      return;
+    }
 
     // Mark whatsappSent flag
     await db.invoices.update(id, { whatsappSent: true });
@@ -183,8 +197,13 @@ export default function InvoicePage() {
       if (inv.customerId) {
         const cust = await db.customers.get(inv.customerId);
         if (cust) {
-          const newOwed = Math.max(0, (cust.amountOwed || 0) - paymentData.amount);
-          await db.customers.update(inv.customerId, { amountOwed: newOwed, synced: 0 });
+          if (inv.invoiceType === "buying") {
+            const newDebt = Math.max(0, (cust.sellerDebt || 0) - paymentData.amount);
+            await db.customers.update(inv.customerId, { sellerDebt: newDebt, synced: 0 });
+          } else {
+            const newOwed = Math.max(0, (cust.amountOwed || 0) - paymentData.amount);
+            await db.customers.update(inv.customerId, { amountOwed: newOwed, synced: 0 });
+          }
         }
       }
     }

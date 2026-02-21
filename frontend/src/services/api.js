@@ -2,10 +2,10 @@ import axios from "axios";
 
 /**
  * Pre-configured Axios instance pointing at the NanoBiz backend.
- * Base URL can be overridden via the VITE_API_URL env variable.
+ * Uses relative "/api" path — Vite dev-server proxies it to the backend.
  */
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: "/api",
   timeout: 15000,
   headers: { "Content-Type": "application/json" },
 });

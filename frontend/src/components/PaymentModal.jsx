@@ -30,6 +30,7 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
   const [method, setMethod] = useState("Cash");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [direction, setDirection] = useState("receive"); // "receive" = customer→seller, "pay" = seller→customer
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -45,6 +46,7 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
       setMethod("Cash");
       setNote("");
       setDate(new Date().toISOString().slice(0, 10));
+      setDirection("receive");
       setError("");
     }
   }, [isOpen]);
@@ -61,13 +63,15 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
       .equals(customerId)
       .toArray()
       .then((all) => {
-        // only show pending / partial invoices
+        // receive = paying off selling invoices; pay = paying off buying invoices
+        const targetType = direction === "receive" ? "selling" : "buying";
         const relevant = all.filter(
-          (inv) => inv.status === "pending" || inv.status === "partial"
+          (inv) => (inv.status === "pending" || inv.status === "partial") &&
+                   (inv.invoiceType === targetType || !inv.invoiceType)
         );
         setInvoices(relevant);
       });
-  }, [customerId]);
+  }, [customerId, direction]);
 
   /* ── Derived ─────────────────────────────────── */
   const selectedCustomer = customers.find((c) => c.id === customerId);
@@ -90,6 +94,7 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
         invoiceId: invoiceId || null,
         amount: Number(amount),
         method,
+        direction, // "receive" or "pay"
         note: note.trim(),
         date,
         createdAt: now,
@@ -99,12 +104,14 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
       // 1. Save payment
       await db.payments.add(payment);
 
-      // 2. Create ledger entry (customer paying → debit = reduces what they owe)
+      // 2. Create ledger entry
+      //    receive = customer paying seller (debit = reduces amountOwed)
+      //    pay = seller paying customer (credit on buying side = reduces sellerDebt)
       await db.ledger.add({
         clientId: `ledger-pay-${payment.id}`,
         customerId,
         invoiceId: invoiceId || null,
-        type: "debit",
+        type: direction === "receive" ? "debit" : "credit",
         amount: Number(amount),
         source: "payment",
         synced: 0,
@@ -122,15 +129,23 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
             amountPaid: newPaid,
             balanceDue: newBalance,
             status: newStatus,
+            synced: 0,
           });
         }
       }
 
-      // 3b. Update cached customer balance (payment reduces what they owe)
+      // 3b. Update cached customer balance
       const cust = await db.customers.get(customerId);
       if (cust) {
-        const newOwed = Math.max(0, (cust.amountOwed || 0) - Number(amount));
-        await db.customers.update(customerId, { amountOwed: newOwed, synced: 0 });
+        if (direction === "receive") {
+          // Customer pays seller → reduce what customer owes
+          const newOwed = Math.max(0, (cust.amountOwed || 0) - Number(amount));
+          await db.customers.update(customerId, { amountOwed: newOwed, synced: 0 });
+        } else {
+          // Seller pays customer → reduce seller's debt
+          const newDebt = Math.max(0, (cust.sellerDebt || 0) - Number(amount));
+          await db.customers.update(customerId, { sellerDebt: newDebt, synced: 0 });
+        }
       }
 
       // 4. Queue for sync
@@ -166,8 +181,12 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
         {/* ── Header ──────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Record Payment</h2>
-            <p className="text-xs text-gray-400">Enter payment details below</p>
+            <h2 className="text-lg font-bold text-gray-800">
+              {direction === "pay" ? "Pay to Customer" : "Record Payment"}
+            </h2>
+            <p className="text-xs text-gray-400">
+              {direction === "pay" ? "Record a payment you're sending to a customer" : "Enter payment details below"}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -185,6 +204,35 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
               {error}
             </div>
           )}
+
+          {/* Direction toggle */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-600">Payment Direction</label>
+            <div className="flex rounded-xl border border-gray-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => { setDirection("receive"); setInvoiceId(""); }}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                  direction === "receive"
+                    ? "bg-[#229799] text-white"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                Receive from Customer
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDirection("pay"); setInvoiceId(""); }}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                  direction === "pay"
+                    ? "bg-red-500 text-white"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                Pay to Customer
+              </button>
+            </div>
+          </div>
 
           {/* Customer */}
           <div className="space-y-1.5">
@@ -318,7 +366,7 @@ export default function PaymentModal({ isOpen, onClose, onSave }) {
             className="px-6 py-2.5 rounded-xl bg-[#229799] hover:bg-[#1b7f81] text-white text-sm font-medium
                        transition-colors shadow-sm disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Confirm Payment"}
+            {saving ? "Saving…" : direction === "pay" ? "Confirm Payout" : "Confirm Payment"}
           </button>
         </div>
       </div>

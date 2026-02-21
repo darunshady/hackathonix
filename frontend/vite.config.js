@@ -30,7 +30,7 @@ export default defineConfig({
         navigateFallback: "/index.html",
         runtimeCaching: [
           {
-            urlPattern: /^https?:\/\/localhost:5000\/api\/.*/i,
+            urlPattern: /\/api\/.*/i,
             handler: "NetworkFirst",
             options: { cacheName: "api-cache", expiration: { maxEntries: 100, maxAgeSeconds: 86400 } },
           },
@@ -40,5 +40,11 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+    },
   },
 });

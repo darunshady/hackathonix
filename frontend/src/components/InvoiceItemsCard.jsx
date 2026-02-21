@@ -43,6 +43,11 @@ export default function InvoiceItemsCard({
   subtotal,
   grandTotal,
   onVoiceInput,
+  isListening = false,
+  aiLoading = false,
+  voiceLang = "ta-IN",
+  onLangChange,
+  onItemFocus,
 }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
@@ -72,6 +77,7 @@ export default function InvoiceItemsCard({
                 placeholder="Item name"
                 value={item.name}
                 onChange={(e) => onUpdateItem(idx, "name", e.target.value)}
+                onFocus={() => onItemFocus?.(idx)}
                 className="col-span-12 sm:col-span-5 border border-gray-200 rounded-xl px-3 py-2.5 text-sm
                            placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#229799]/30 focus:border-[#229799]
                            transition-shadow"
@@ -135,12 +141,39 @@ export default function InvoiceItemsCard({
         <button
           type="button"
           onClick={onVoiceInput}
-          title="Voice Input"
-          className="w-11 h-11 rounded-full bg-[#229799]/10 text-[#229799] hover:bg-[#229799]/20
-                     flex items-center justify-center transition-colors"
+          disabled={aiLoading}
+          title={isListening ? "Listening…" : aiLoading ? "AI processing…" : "Voice Input"}
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
+            isListening
+              ? "bg-red-100 text-red-500 animate-pulse"
+              : aiLoading
+              ? "bg-amber-100 text-amber-500 cursor-wait"
+              : "bg-[#229799]/10 text-[#229799] hover:bg-[#229799]/20"
+          }`}
         >
-          <MicIcon />
+          {aiLoading ? (
+            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <MicIcon />
+          )}
         </button>
+
+        {/* Language toggle */}
+        {onLangChange && (
+          <button
+            type="button"
+            onClick={() => onLangChange(voiceLang === "ta-IN" ? "en-IN" : "ta-IN")}
+            title={voiceLang === "ta-IN" ? "Switch to English" : "Switch to Tamil"}
+            className="h-9 px-3 rounded-lg border border-gray-200 text-xs font-semibold
+                       text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+          >
+            <span className="text-base leading-none">{voiceLang === "ta-IN" ? "த" : "A"}</span>
+            <span>{voiceLang === "ta-IN" ? "Tamil" : "English"}</span>
+          </button>
+        )}
       </div>
 
       {/* ── Divider ────────────────────────────── */}

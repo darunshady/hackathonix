@@ -30,5 +30,9 @@ export function sendWhatsAppInvoice(phone, invoiceData) {
   const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
   // Open in a new tab / WhatsApp app
-  window.open(url, "_blank");
+  try {
+    window.open(url, "_blank");
+  } catch (e) {
+    console.error("[WhatsApp] Failed to open link:", e);
+  }
 }

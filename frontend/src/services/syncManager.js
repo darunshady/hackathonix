@@ -49,6 +49,8 @@ export async function getPendingQueue() {
  * @returns {{ ok: boolean, synced: object, errors: array }}
  */
 export async function syncNow() {
+  console.log("[SyncManager] syncNow() called — gathering unsynced records…");
+
   // Gather un-synced records from IndexedDB
   const unsyncedCustomers = await db.customers.where("synced").equals(0).toArray();
   const unsyncedInvoices = await db.invoices.where("synced").equals(0).toArray();
@@ -66,6 +68,13 @@ export async function syncNow() {
     // payments table may not exist on older schema versions
   }
 
+  console.log("[SyncManager] Unsynced counts:", {
+    customers: unsyncedCustomers.length,
+    invoices: unsyncedInvoices.length,
+    ledger: unsyncedLedger.length,
+    payments: unsyncedPayments.length,
+  });
+
   const nothingToSync =
     unsyncedCustomers.length === 0 &&
     unsyncedInvoices.length === 0 &&
@@ -73,6 +82,7 @@ export async function syncNow() {
     unsyncedPayments.length === 0;
 
   if (nothingToSync) {
+    console.log("[SyncManager] Nothing to sync — skipping.");
     return { ok: true, synced: { customers: 0, invoices: 0, ledger: 0, payments: 0 }, errors: [] };
   }
 
@@ -123,6 +133,8 @@ export async function syncNow() {
 
     const { data } = await api.post("/sync", payload);
 
+    console.log("[SyncManager] Server response:", data);
+
     // Mark local records as synced
     await Promise.all(
       unsyncedCustomers.map((c) => db.customers.update(c.id, { synced: 1 }))
@@ -140,6 +152,7 @@ export async function syncNow() {
     // Clear the queue
     await db.syncQueue.clear();
 
+    console.log("[SyncManager] ✅ Sync complete — local records marked as synced.");
     return { ok: true, synced: data.synced, errors: data.errors };
   } catch (err) {
     console.error("[SyncManager] sync failed:", err);

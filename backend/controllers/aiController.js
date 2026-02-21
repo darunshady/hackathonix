@@ -35,7 +35,7 @@ TAMIL NUMBER WORDS (convert to digits before returning amount):
 - EXAMPLES: "eranoor rubai"=200, "anju aayiram"=5000, "pathu latcham"=1000000
 
 OTHER RULES:
-- party_name: the person or business name mentioned (English or Tamil transliteration)
+- party_name: ALWAYS write the name in English/Roman letters only — never Tamil script. Transliterate if needed. Examples: "அபினேஷ்" => "Abinesh", "இமானுவேல்" => "Emmanuel", "ராஜ்" => "Raj"
 - If quantity not mentioned, use 1
 - If multiple numbers, pick the monetary amount (larger number is usually the price)
 - payment_method: cash/rokkam => "cash", upi/gpay/phonepe => "upi", bank/neft/transfer => "bank", else null

@@ -19,6 +19,12 @@ const Payment = require("../models/Payment");
 exports.syncAll = async (req, res) => {
   try {
     const { customers = [], invoices = [], ledger = [], payments = [] } = req.body;
+    console.log("[syncController] Incoming sync payload sizes:", {
+      customers: customers.length,
+      invoices: invoices.length,
+      ledger: ledger.length,
+      payments: payments.length,
+    });
     const results = { customers: [], invoices: [], ledger: [], payments: [], errors: [] };
 
     // ── Sync Customers (client always wins) ───────────────────
@@ -146,6 +152,14 @@ exports.syncAll = async (req, res) => {
       },
       invoicesNeedingWhatsApp,
       errors: results.errors,
+    });
+
+    console.log("[syncController] ✅ Sync complete:", {
+      customers: results.customers.length,
+      invoices: results.invoices.length,
+      ledger: results.ledger.length,
+      payments: results.payments.length,
+      errors: results.errors.length,
     });
   } catch (error) {
     console.error("syncAll error:", error);

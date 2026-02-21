@@ -27,7 +27,7 @@
  *       When ready, switch imports to syncManagerV2.
  */
 
-import db from "../db/schema";
+import db from "../db";
 import { bulkSync, sendWhatsApp } from "./apiService";
 
 // ────────────────────────────────────────────────────────────────

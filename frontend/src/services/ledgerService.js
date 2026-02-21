@@ -11,7 +11,7 @@
  * ──────────────────────────────────────────────────────────────
  */
 
-import db from "../db/schema";
+import db from "../db";
 
 /**
  * Generate a UUID v4-ish identifier for local records.
@@ -188,4 +188,68 @@ export async function getTopDebtors(limit = 5) {
     .sort((a, b) => (b.balance || 0) - (a.balance || 0))
     .slice(0, limit)
     .map((c) => ({ id: c.id, name: c.name, phone: c.phone, balance: c.balance }));
+}
+
+// ────────────────────────────────────────────────────────────────
+// Universal transaction helper
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * applyTransaction — single entry point for all ledger + balance ops.
+ *
+ * Maps the `type` to credit/debit direction:
+ *   selling / credit  → customer owes us more  (+balance / +amountOwed)
+ *   buying / debit    → payment or purchase     (−balance / −amountOwed)
+ *
+ * @param {object} opts
+ * @param {string}  opts.customerId
+ * @param {number}  opts.amount      – positive value
+ * @param {"selling"|"buying"|"credit"|"debit"} opts.type
+ * @param {string}  [opts.invoiceId]
+ * @param {string}  [opts.description]
+ * @param {"invoice"|"payment"|"manual"} [opts.source]
+ * @returns {Promise<object>} the created ledger entry
+ */
+export async function applyTransaction({
+  customerId,
+  amount,
+  type,
+  invoiceId = null,
+  description = "",
+  source = "invoice",
+}) {
+  if (!customerId || amount == null) {
+    throw new Error("applyTransaction requires customerId and amount");
+  }
+
+  const isCredit = type === "selling" || type === "credit";
+
+  const entry = {
+    clientId: `ledger-${customerId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    customerId,
+    invoiceId,
+    type,
+    amount: Math.abs(amount),
+    description: description || (isCredit ? `Credit ₹${Math.abs(amount)}` : `Debit ₹${Math.abs(amount)}`),
+    source,
+    synced: 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  await db.ledger.add(entry);
+
+  // Update cached balances on the customer record
+  const customer = await db.customers.get(customerId);
+  if (customer) {
+    const delta = isCredit ? Math.abs(amount) : -Math.abs(amount);
+    const newBalance = (customer.balance || 0) + delta;
+    const newOwed = (customer.amountOwed || 0) + delta;
+    await db.customers.update(customerId, {
+      balance: newBalance,
+      amountOwed: newOwed,
+      synced: 0,
+    });
+  }
+
+  return entry;
 }

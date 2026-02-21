@@ -102,29 +102,20 @@ export default function CustomerCard({
           </span>
         </div>
 
-        {/* Amount Owed (Net) */}
+        {/* They Owe (customer → seller) */}
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">Amount Owed</p>
-          {(() => {
-            const owed = customer.amountOwed ?? 0;
-            const debt = customer.sellerDebt ?? 0;
-            const net = owed - debt;
-            const isNegative = net < 0;
-            return (
-              <>
-                <p className={`font-bold text-base ${
-                  isNegative ? "text-red-600" : "text-amber-600"
-                }`}>
-                  {isNegative ? "-" : ""}₹{Math.abs(net).toLocaleString("en-IN")}
-                </p>
-                {debt > 0 && (
-                  <span className="text-[10px] text-gray-400 leading-tight" title={`Seller Debt: ₹${debt.toLocaleString("en-IN")}`}>
-                    Debt Adjusted
-                  </span>
-                )}
-              </>
-            );
-          })()}
+          <p className="text-xs text-gray-400 mb-0.5">They Owe</p>
+          <p className="font-bold text-base text-amber-600">
+            ₹{(customer.amountOwed ?? 0).toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        {/* You Owe (seller → customer) */}
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">You Owe</p>
+          <p className={`font-bold text-base ${(customer.sellerDebt ?? 0) > 0 ? "text-red-600" : "text-gray-400"}`}>
+            ₹{(customer.sellerDebt ?? 0).toLocaleString("en-IN")}
+          </p>
         </div>
       </div>
     </div>

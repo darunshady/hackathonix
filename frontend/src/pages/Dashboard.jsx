@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import db from "../db";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import StatCard from "../components/StatCard";
@@ -12,6 +12,7 @@ import TopDebtors from "../components/TopDebtors";
  */
 export default function Dashboard() {
   const online = useOnlineStatus();
+  const location = useLocation();
   const [stats, setStats] = useState({
     customers: 0,
     newCustomers: 0,
@@ -19,7 +20,7 @@ export default function Dashboard() {
     pendingSync: 0,
     revenue: 0,
     pendingAmount: 0,
-    overdueAmount: 0,
+    sellerDebt: 0,
   });
 
   useEffect(() => {
@@ -37,32 +38,38 @@ export default function Dashboard() {
       const invoices = allInvoices.length;
       const pendingSync = allInvoices.filter((i) => !i.synced).length;
 
-      const revenue = allInvoices
-        .filter((i) => i.status === "paid")
+      // Include payments from the payments table
+      let allPayments = [];
+      try { allPayments = await db.payments.toArray(); } catch { /* table may not exist */ }
+      const paymentTotal = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      // Revenue = total value of all selling invoices + standalone payments
+      const invoiceRevenue = allInvoices
+        .filter((i) => i.invoiceType === "selling")
         .reduce((sum, i) => sum + (i.total || 0), 0);
+      const revenue = invoiceRevenue + paymentTotal;
 
       const pendingAmount = allInvoices
-        .filter((i) => i.status === "pending")
-        .reduce((sum, i) => sum + (i.total || 0), 0);
+        .filter((i) => i.status !== "paid" && i.status !== "draft")
+        .reduce((sum, i) => sum + (i.balanceDue ?? Math.max(0, (i.total || 0) - (i.amountPaid || 0))), 0);
 
-      // Overdue = pending amount from customers with amountOwed field
-      const overdueAmount = allCustomers.reduce(
-        (sum, c) => sum + (c.amountOwed || 0),
-        0
-      );
+      // Seller's Debt = what seller owes to customers (unpaid buying invoices)
+      const sellerDebt = allInvoices
+        .filter((i) => i.invoiceType === "buying" && i.status !== "paid")
+        .reduce((sum, i) => sum + (i.balanceDue ?? Math.max(0, (i.total || 0) - (i.amountPaid || 0))), 0);
 
       setStats({
         customers,
         newCustomers,
         invoices,
         pendingSync,
-        revenue: revenue || 12500, // fallback dummy
-        pendingAmount: pendingAmount || 2500,
-        overdueAmount: overdueAmount || 1200,
+        revenue,
+        pendingAmount,
+        sellerDebt,
       });
     }
     load();
-  }, []);
+  }, [location.key]);
 
   return (
     <div className="space-y-6">
@@ -112,7 +119,7 @@ export default function Dashboard() {
         {/* 2 — Total Customers */}
         <StatCard
           label="Total Customers"
-          value={stats.customers || 128}
+          value={stats.customers}
           subtitle={`+ ${stats.newCustomers || 3} New`}
           subtitleColor="text-gray-400"
           to="/customers"
@@ -128,8 +135,8 @@ export default function Dashboard() {
         {/* 3 — Active Invoices */}
         <StatCard
           label="Active Invoices"
-          value={stats.invoices || 15}
-          subtitle={`₹${(stats.pendingAmount || 8000).toLocaleString("en-IN")} Amount Due`}
+          value={stats.invoices}
+          subtitle={`₹${stats.pendingAmount.toLocaleString("en-IN")} Amount Due`}
           subtitleColor="text-gray-400"
           to="/invoices"
           accentBorder="border-gray-200"
@@ -141,14 +148,16 @@ export default function Dashboard() {
           iconBg="bg-cyan-50"
         />
 
-        {/* 4 — Overdue Amount */}
+        {/* 4 — Seller's Debt */}
         <StatCard
-          label="Overdue Amount"
-          value={`₹${stats.overdueAmount.toLocaleString("en-IN")}`}
-          trend="down"
-          trendColor="text-red-500"
+          label="Seller's Debt"
+          value={`₹${stats.sellerDebt.toLocaleString("en-IN")}`}
+          subtitle="Owed to customers"
+          subtitleColor="text-red-400"
+          trend={stats.sellerDebt > 0 ? "down" : "up"}
+          trendColor={stats.sellerDebt > 0 ? "text-red-500" : "text-emerald-500"}
           to="/invoices"
-          accentBorder="border-gray-200"
+          accentBorder="border-red-200"
           icon={
             <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />

@@ -54,6 +54,7 @@ export default function CreateInvoice() {
 
   // ── Line items ───────────────────────────────────────
   const [items, setItems] = useState([{ name: "", qty: 1, price: 0 }]);
+  const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [taxPercent, setTaxPercent] = useState(0);
 
   const updateItem = (index, field, value) => {
@@ -61,7 +62,11 @@ export default function CreateInvoice() {
     updated[index] = { ...updated[index], [field]: value };
     setItems(updated);
   };
-  const addItem = () => setItems([...items, { name: "", qty: 1, price: 0 }]);
+  const addItem = () => {
+    const newItems = [...items, { name: "", qty: 1, price: 0 }];
+    setItems(newItems);
+    setActiveItemIndex(newItems.length - 1);
+  };
   const removeItem = (index) => {
     if (items.length === 1) return;
     setItems(items.filter((_, i) => i !== index));
@@ -75,15 +80,181 @@ export default function CreateInvoice() {
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [paymentStatus, setPaymentStatus] = useState("credit");
   const [amountPaid, setAmountPaid] = useState("");
+
+  const handlePaymentToggle = (status) => {
+    setPaymentStatus(status);
+    if (status === "paid") setAmountPaid(""); // clear so paidAmt = grandTotal
+  };
   const [notes, setNotes] = useState("");
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
 
   // Sync label
   const syncLabel = online ? "Online" : "Offline";
 
-  // ── Voice input placeholder ──────────────────────────
+  // ── Voice / AI state ─────────────────────────────────
+  const [isListening, setIsListening] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiToast, setAiToast] = useState("");
+  const [voiceLang, setVoiceLang] = useState("ta-IN"); // "ta-IN" | "en-IN"
+
+  const showToast = (msg, duration = 4000) => {
+    setAiToast(msg);
+    setTimeout(() => setAiToast(""), duration);
+  };
+
+  const processAIResult = async (transcript) => {
+    showToast(`🎤 "${transcript}" — parsing with AI…`, 8000);
+    setAiLoading(true);
+
+    try {
+      const { parseWithAI } = await import("../services/aiService");
+      const result = await parseWithAI(transcript);
+      const txType = (result.transaction_type || "").toLowerCase();
+
+      // ── Transaction type: user controls this manually, AI does NOT change it ─
+
+      // ── Auto-fill party ────────────────────────────────────────────────────
+      if (result.party_name) {
+        const norm = (s) =>
+          (s || "")
+            .toLowerCase()
+            .replace(/(sir|anna|amma|madam|bhai|boss|akka|mr|mrs|bro)/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+        const query = norm(result.party_name);
+
+        // Try fresh DB read; fall back to already-loaded state array
+        let list = customers;
+        try {
+          list = await db.customers.toArray();
+        } catch (dbErr) {
+          console.warn("DB read failed, using cached list:", dbErr);
+        }
+
+        const match = list.find((c) => {
+          const name = norm(c.name);
+          return name === query || name.includes(query) || query.includes(name);
+        });
+
+        if (match) {
+          setCustomerId(String(match.id));
+        } else {
+          showToast(`🔍 "${result.party_name}" not in contacts — select manually`, 5000);
+        }
+      }
+
+      // ── Auto-fill the active item row (not always index 0) ───────────────────
+      if (txType !== "payment") {
+        setItems((prev) => {
+          const updated = [...prev];
+          const idx = Math.min(activeItemIndex, updated.length - 1);
+          updated[idx] = {
+            name: result.item_name || "",
+            qty: result.quantity || 1,
+            price: result.amount || 0,
+          };
+          return updated;
+        });
+      }
+
+      // ── Payment detected: redirect to payments page ───────────────────────────
+      if (txType === "payment") {
+        showToast("💰 Payment detected — redirecting to Payments page…");
+        setTimeout(() => navigate("/payments"), 1500);
+        return;
+      }
+
+      showToast("✅ AI filled the form! Review and save.");
+    } catch (err) {
+      console.error("AI parse failed:", err?.message || err);
+      showToast(`⚠️ Error: ${err?.message || "AI could not understand"}. Please edit manually.`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleVoiceInput = () => {
-    alert("🎤 Voice input coming soon!\nThis will use AI to auto-fill invoice items from speech.");
+    // Offline guard
+    if (!navigator.onLine) {
+      return showToast("⚠️ AI requires an internet connection.");
+    }
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      return showToast("⚠️ Speech recognition not supported in this browser.");
+    }
+
+    // If already listening, ignore
+    if (isListening) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = voiceLang;
+    recognition.continuous = true;       // keep listening until stopped
+    recognition.interimResults = true;   // show partial text while speaking
+    recognition.maxAlternatives = 1;
+
+    let finalTranscript = "";
+    let silenceTimer = null;
+
+    const stopAndProcess = () => {
+      clearTimeout(silenceTimer);
+      recognition.stop();
+    };
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      finalTranscript = "";
+      showToast(
+        voiceLang === "ta-IN"
+          ? "🎤 கேட்கிறேன்… பேசுங்கள் (10 விநாடி)"
+          : "🎤 Listening… speak now (10 seconds)",
+        10000
+      );
+      // Hard stop after 10 seconds
+      silenceTimer = setTimeout(stopAndProcess, 10000);
+    };
+
+    recognition.onresult = (event) => {
+      let interim = "";
+      for (let i = 0; i < event.results.length; i++) {
+        const chunk = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += chunk + " ";
+        } else {
+          interim = chunk;
+        }
+      }
+      // Reset silence timer — gives 3s after last word
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(stopAndProcess, 3000);
+
+      // Show live preview
+      const preview = (finalTranscript + interim).trim();
+      if (preview) setAiToast(`🎤 "${preview}"`);
+    };
+
+    recognition.onerror = (e) => {
+      clearTimeout(silenceTimer);
+      setIsListening(false);
+      if (e.error === "no-speech") return showToast("🎤 No speech detected. Try again.");
+      if (e.error === "aborted") return;
+      showToast("⚠️ Mic error: " + e.error);
+    };
+
+    recognition.onend = () => {
+      clearTimeout(silenceTimer);
+      setIsListening(false);
+      const text = finalTranscript.trim();
+      if (text) {
+        processAIResult(text);
+      } else {
+        showToast("🎤 No speech detected. Try again.");
+      }
+    };
+
+    recognition.start();
   };
 
   // ── Submit helpers ───────────────────────────────────
@@ -93,6 +264,22 @@ export default function CreateInvoice() {
     if (items.some((i) => Number(i.qty) <= 0)) return alert("All items must have quantity greater than 0");
     if (items.some((i) => Number(i.price) <= 0)) return alert("All items must have a price greater than 0");
     if (grandTotal <= 0) return alert("Invoice total must be greater than 0");
+
+    // When status is "paid", the amount-paid field is hidden — treat the full
+    // total as paid so balanceDue is correctly 0.
+    const paidAmt =
+      paymentStatus === "paid"
+        ? grandTotal
+        : Math.min(Number(amountPaid || 0), grandTotal);
+
+    // Derive status: partial when some (but not all) has been paid
+    const invoiceStatus = isDraft
+      ? "draft"
+      : paidAmt >= grandTotal
+      ? "paid"
+      : paidAmt > 0
+      ? "partial"
+      : "pending";
 
     const newInvoice = {
       id: crypto.randomUUID(),
@@ -105,9 +292,9 @@ export default function CreateInvoice() {
       })),
       total: grandTotal,
       taxPercent: Number(taxPercent),
-      amountPaid: Number(amountPaid || 0),
-      balanceDue: Math.max(0, grandTotal - Number(amountPaid || 0)),
-      status: isDraft ? "draft" : paymentStatus === "paid" ? "paid" : "pending",
+      amountPaid: paidAmt,
+      balanceDue: Math.max(0, grandTotal - paidAmt),
+      status: invoiceStatus,
       notes: notes.trim(),
       synced: navigator.onLine ? 1 : 0,
       createdAt: invoiceDate
@@ -117,32 +304,41 @@ export default function CreateInvoice() {
 
     await db.invoices.add(newInvoice);
 
-    // ── Ledger entry ─────────────────────────────────
+    // ── Ledger entry (skip for drafts — finalized on publish) ────
     if (!isDraft) {
       await db.ledger.add({
         clientId: `ledger-${newInvoice.id}`,
         customerId,
         invoiceId: newInvoice.id,
         type: invoiceType,
-        amount: grandTotal,
+        amount: newInvoice.balanceDue,
         source: "invoice",
         synced: 0,
         createdAt: newInvoice.createdAt,
       });
+    }
 
-      // ── Update cached customer balance ───────────
+    // ── Always update cached customer balance ───────────
+    {
       const cust = await db.customers.get(customerId);
       if (cust) {
-        const currentOwed = cust.amountOwed || 0;
-        const newOwed = invoiceType === "selling"
-          ? currentOwed + grandTotal
-          : Math.max(0, currentOwed - grandTotal);
-        await db.customers.update(customerId, {
-          amountOwed: newOwed,
-          hasPendingInvoice: true,
-          lastInvoiceDate: newInvoice.createdAt.slice(0, 10),
-          synced: 0,
-        });
+        if (invoiceType === "selling") {
+          const newOwed = (cust.amountOwed || 0) + newInvoice.balanceDue;
+          await db.customers.update(customerId, {
+            amountOwed: newOwed,
+            hasPendingInvoice: true,
+            lastInvoiceDate: newInvoice.createdAt.slice(0, 10),
+            synced: 0,
+          });
+        } else {
+          const newDebt = (cust.sellerDebt || 0) + newInvoice.balanceDue;
+          await db.customers.update(customerId, {
+            sellerDebt: newDebt,
+            hasPendingInvoice: true,
+            lastInvoiceDate: newInvoice.createdAt.slice(0, 10),
+            synced: 0,
+          });
+        }
       }
     }
 
@@ -154,9 +350,14 @@ export default function CreateInvoice() {
         await api.post("/invoices", {
           clientId: newInvoice.id,
           customerId: newInvoice.customerId,
+          invoiceType: newInvoice.invoiceType,
           items: newInvoice.items,
           total: newInvoice.total,
+          taxPercent: newInvoice.taxPercent,
+          amountPaid: newInvoice.amountPaid,
+          balanceDue: newInvoice.balanceDue,
           status: newInvoice.status,
+          notes: newInvoice.notes,
         });
         await db.invoices.update(newInvoice.id, { synced: 1 });
       } catch {
@@ -171,12 +372,18 @@ export default function CreateInvoice() {
         // Queued: will auto-send after next sync
         await db.invoices.update(newInvoice.id, { whatsappPending: true });
       } else {
+        const custName = selectedCustomer?.name ?? "Customer";
         const msg =
           invoiceType === "selling"
-            ? `Hi ${selectedCustomer.name}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`
-            : `Hi ${selectedCustomer.name}, we have recorded a purchase of ₹${grandTotal.toLocaleString("en-IN")}. Thank you!`;
-        window.open(`https://wa.me/91${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-        await db.invoices.update(newInvoice.id, { whatsappSent: true });
+            ? `Hi ${custName}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`
+            : `Hi ${custName}, we have recorded a purchase of ₹${grandTotal.toLocaleString("en-IN")}. Thank you!`;
+        try {
+          window.open(`https://wa.me/91${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+          await db.invoices.update(newInvoice.id, { whatsappSent: true });
+        } catch (e) {
+          console.error("[CreateInvoice] WhatsApp open failed:", e);
+          await db.invoices.update(newInvoice.id, { whatsappPending: true });
+        }
       }
     }
 
@@ -184,7 +391,7 @@ export default function CreateInvoice() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="flex flex-col gap-4 pb-4 lg:h-[calc(100vh-5.5rem)]">
       {/* ── Header ──────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Create New Invoice</h1>
@@ -194,7 +401,8 @@ export default function CreateInvoice() {
       {/* ── Transaction Type Toggle ─────────────── */}
       <TransactionTypeToggle value={invoiceType} onChange={setInvoiceType} />
 
-      {/* ── Two-column grid ─────────────────────── */}
+      {/* ── Two-column grid (scrollable on desktop) ─────────── */}
+      <div className="flex-1 min-h-0 lg:overflow-y-auto">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left — Items (wider) */}
         <div className="lg:col-span-3">
@@ -208,6 +416,11 @@ export default function CreateInvoice() {
             subtotal={subtotal}
             grandTotal={grandTotal}
             onVoiceInput={handleVoiceInput}
+            isListening={isListening}
+            aiLoading={aiLoading}
+            voiceLang={voiceLang}
+            onLangChange={setVoiceLang}
+            onItemFocus={setActiveItemIndex}
           />
         </div>
 
@@ -221,7 +434,7 @@ export default function CreateInvoice() {
             invoiceDate={invoiceDate}
             onDateChange={setInvoiceDate}
             paymentStatus={paymentStatus}
-            onPaymentToggle={setPaymentStatus}
+            onPaymentToggle={handlePaymentToggle}
             amountPaid={amountPaid}
             onAmountPaidChange={setAmountPaid}
             grandTotal={grandTotal}
@@ -242,6 +455,7 @@ export default function CreateInvoice() {
           )}
         </div>
       </div>
+      </div>{/* end scrollable area */}
 
       {/* ── Bottom Actions ──────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -276,6 +490,13 @@ export default function CreateInvoice() {
           </button>
         </div>
       </div>
+
+      {/* ── AI Toast Notification ───────────────── */}
+      {aiToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-5 py-3 rounded-xl shadow-lg max-w-md text-center animate-fade-in">
+          {aiToast}
+        </div>
+      )}
     </div>
   );
 }
