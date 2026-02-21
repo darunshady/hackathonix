@@ -57,9 +57,9 @@ export default function Dashboard() {
         newCustomers,
         invoices,
         pendingSync,
-        revenue: revenue || 12500, // fallback dummy
-        pendingAmount: pendingAmount || 2500,
-        overdueAmount: overdueAmount || 1200,
+        revenue,
+        pendingAmount,
+        overdueAmount,
       });
     }
     load();

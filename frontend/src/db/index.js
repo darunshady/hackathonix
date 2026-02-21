@@ -12,7 +12,7 @@ const db = new Dexie("NanoBizDB");
 
 db.version(1).stores({
   // ── Core tables ──────────────────────────────
-  customers: "id, name, phone, synced",
+  customers: "phone, name, id, synced",
   invoices: "id, customerId, status, synced",
 
   // ── Offline sync queue ───────────────────────
@@ -21,7 +21,7 @@ db.version(1).stores({
 });
 
 db.version(2).stores({
-  customers: "id, name, phone, synced",
+  customers: "phone, name, id, synced",
   invoices: "id, customerId, status, synced, invoiceType",
 
   // ── Ledger for double-entry balance tracking ─
@@ -33,7 +33,7 @@ db.version(2).stores({
 });
 
 db.version(3).stores({
-  customers: "id, name, phone, synced",
+  customers: "phone, name, id, synced",
   invoices: "id, customerId, status, synced, invoiceType",
   ledger: "++id, customerId, invoiceId, type, amount, synced, createdAt",
 

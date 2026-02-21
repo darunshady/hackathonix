@@ -22,14 +22,14 @@ const db = new Dexie("NanoBizDB");
 
 // Version 1: original tables (must stay for Dexie upgrade path)
 db.version(1).stores({
-  customers: "id, name, phone, synced",
+  customers: "phone, name, id, synced",
   invoices: "id, customerId, status, synced",
   syncQueue: "++queueId, type, recordId, action, createdAt",
 });
 
 // Version 2: add ledger table + balance/status on customers + whatsappSent on invoices
 db.version(2).stores({
-  customers: "id, name, phone, balance, status, synced",
+  customers: "phone, name, id, balance, status, synced",
   invoices: "id, customerId, status, synced, whatsappSent",
   syncQueue: "++queueId, type, recordId, action, createdAt",
   ledger: "id, customerId, type, amount, invoiceId, synced, createdAt",
