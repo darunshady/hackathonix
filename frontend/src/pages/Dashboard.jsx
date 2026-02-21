@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import db from "../db";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import StatCard from "../components/StatCard";
-import RevenueCard from "../components/RevenueCard";
 import RevenueChart from "../components/RevenueChart";
 import TopDebtors from "../components/TopDebtors";
 
@@ -57,9 +56,9 @@ export default function Dashboard() {
         newCustomers,
         invoices,
         pendingSync,
-        revenue,
-        pendingAmount,
-        overdueAmount,
+        revenue: revenue || 12500, // fallback dummy
+        pendingAmount: pendingAmount || 2500,
+        overdueAmount: overdueAmount || 1200,
       });
     }
     load();
@@ -92,11 +91,22 @@ export default function Dashboard() {
 
       {/* ═══ Stats Cards ══════════════════════════════════════════ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1 — Total Sales Overview */}
-        <RevenueCard
-          paidAmount={stats.revenue}
-          pendingAmount={stats.pendingAmount}
-          expenses={6000}  // dummy — replace with real data later
+        {/* 1 — Total Revenue */}
+        <StatCard
+          label="Total Revenue"
+          value={`₹${stats.revenue.toLocaleString("en-IN")}`}
+          subtitle={`₹${stats.pendingAmount.toLocaleString("en-IN")} Pending`}
+          subtitleColor="text-amber-500"
+          trend="up"
+          trendColor="text-emerald-500"
+          to="/invoices"
+          accentBorder="border-[#229799]"
+          icon={
+            <svg className="w-5 h-5 text-[#229799]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          }
+          iconBg="bg-cyan-50"
         />
 
         {/* 2 — Total Customers */}
@@ -131,69 +141,21 @@ export default function Dashboard() {
           iconBg="bg-cyan-50"
         />
 
-        {/* 4 — Cash Flow (This Month) */}
-        {(() => {
-          const paidThisMonth = 18000;
-          const expensesThisMonth = 12000;
-          const cashFlow = paidThisMonth - expensesThisMonth;
-          const isPositive = cashFlow >= 0;
-          const fmt = (n) => `₹${Math.abs(n).toLocaleString("en-IN")}`;
-
-          return (
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6 flex flex-col gap-3">
-              {/* Header */}
-              <div className="flex items-start justify-between">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                  Cash Flow (This Month)
-                </p>
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-cyan-50 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-[#229799]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Main amount */}
-              <div className="flex items-center gap-2">
-                <span className={`text-3xl font-bold leading-tight ${isPositive ? "text-green-600" : "text-red-600"}`}>
-                  {isPositive ? "" : "− "}{fmt(cashFlow)}
-                </span>
-                {isPositive ? (
-                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25" />
-                  </svg>
-                )}
-              </div>
-
-              <p className="text-[11px] text-gray-400">Compared to last month</p>
-
-              {/* Divider */}
-              <hr className="border-gray-100" />
-
-              {/* Breakdown */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-sm text-gray-500">Paid</span>
-                  </div>
-                  <span className="text-sm font-semibold text-green-600">{fmt(paidThisMonth)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-400" />
-                    <span className="text-sm text-gray-500">Expenses</span>
-                  </div>
-                  <span className="text-sm font-semibold text-red-500">{fmt(expensesThisMonth)}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {/* 4 — Overdue Amount */}
+        <StatCard
+          label="Overdue Amount"
+          value={`₹${stats.overdueAmount.toLocaleString("en-IN")}`}
+          trend="down"
+          trendColor="text-red-500"
+          to="/invoices"
+          accentBorder="border-gray-200"
+          icon={
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+          }
+          iconBg="bg-red-50"
+        />
       </div>
 
       {/* ═══ Two-Column: Chart + Top Debtors ══════════════════════ */}

@@ -150,9 +150,6 @@ export default function Customers() {
     e.preventDefault();
     if (!form.name.trim()) return alert("Customer name is required.");
     if (!form.phone.trim()) return alert("Phone number is required.");
-    // Phone must be valid (digits, min length)
-    const phoneDigits = form.phone.replace(/\D/g, "");
-    if (phoneDigits.length < 8) return alert("Enter a valid phone number (min 8 digits).");
 
     // Check for duplicate phone
     const existing = await db.customers.toArray();
@@ -217,10 +214,6 @@ export default function Customers() {
   };
 
   const handleDrawerSave = async (updated) => {
-    if (!updated.phone || updated.phone.replace(/\D/g, "").length < 8) {
-      alert("Phone number is required and must be at least 8 digits.");
-      return;
-    }
     await db.customers.update(updated.id, {
       name: updated.name,
       phone: updated.phone,

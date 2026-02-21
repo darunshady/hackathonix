@@ -176,31 +176,15 @@ export default function CreateInvoice() {
             ? `Hi ${selectedCustomer.name}, your invoice for ₹${grandTotal.toLocaleString("en-IN")} has been created. Thank you!`
             : `Hi ${selectedCustomer.name}, we have recorded a purchase of ₹${grandTotal.toLocaleString("en-IN")}. Thank you!`;
         window.open(`https://wa.me/91${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-        await db.invoices.update(newInvoice.id, { whatsappSent: true, whatsappPending: false });
+        await db.invoices.update(newInvoice.id, { whatsappSent: true });
       }
-    }
-
-    // After sync, check for pending WhatsApp messages and send if online
-    if (navigator.onLine) {
-      const pendingInvoices = await db.invoices.where("whatsappPending").equals(true).toArray();
-      for (const inv of pendingInvoices) {
-        if (inv.phone) {
-          const msg =
-            inv.invoiceType === "selling"
-              ? `Hi ${inv.customerName}, your invoice for ₹${(inv.amount ?? 0).toLocaleString("en-IN")} has been created. Thank you!`
-              : `Hi ${inv.customerName}, we have recorded a purchase of ₹${(inv.amount ?? 0).toLocaleString("en-IN")}. Thank you!`;
-          window.open(`https://wa.me/91${inv.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-          await db.invoices.update(inv.id, { whatsappSent: true, whatsappPending: false });
-        }
-      }
-    }
     }
 
     navigate("/invoices");
   };
 
   return (
-    <div className="space-y-6 pb-12 min-h-screen flex flex-col justify-start">
+    <div className="space-y-6 pb-12">
       {/* ── Header ──────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Create New Invoice</h1>
@@ -211,7 +195,7 @@ export default function CreateInvoice() {
       <TransactionTypeToggle value={invoiceType} onChange={setInvoiceType} />
 
       {/* ── Two-column grid ─────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left — Items (wider) */}
         <div className="lg:col-span-3">
           <InvoiceItemsCard

@@ -106,14 +106,9 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, on
               filtered.map((inv) => (
                 <tr
                   key={inv.id}
-                  className={`border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${inv.invoiceType === 'buying' ? 'bg-blue-50' : inv.invoiceType === 'selling' ? 'bg-green-50' : ''}`}
+                  className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors"
                 >
-                  <td className="px-6 py-4 font-medium text-gray-800">
-                    {inv.id}
-                    {inv.invoiceType && (
-                      <span className={`ml-2 text-xs font-semibold rounded px-2 py-0.5 ${inv.invoiceType === 'selling' ? 'bg-green-200 text-green-700' : 'bg-blue-200 text-blue-700'}`}>{inv.invoiceType.charAt(0).toUpperCase() + inv.invoiceType.slice(1)}</span>
-                    )}
-                  </td>
+                  <td className="px-6 py-4 font-medium text-gray-800">{inv.id}</td>
                   <td className="px-6 py-4 text-gray-700">{inv.customerName}</td>
                   <td className="px-6 py-4 text-gray-500">{inv.phone}</td>
                   <td className="px-6 py-4 text-gray-500">{inv.date}</td>
@@ -168,6 +163,19 @@ export default function InvoiceTable({ invoices = [], onMarkPaid, onResendWA, on
                       >
                         <EyeIcon />
                       </Link>
+
+                      {/* Record Payment */}
+                      {inv.paymentStatus !== "paid" && (
+                        <button
+                          onClick={() => onRecordPayment?.(inv)}
+                          title="Record Payment"
+                          className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg
+                                     bg-[#229799] text-white hover:bg-[#1b7f81] transition-colors"
+                        >
+                          <CurrencyIcon />
+                          Pay
+                        </button>
+                      )}
 
                       {/* Mark as Paid */}
                       {inv.paymentStatus !== "paid" && (
