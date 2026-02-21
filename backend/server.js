@@ -11,6 +11,7 @@ const voiceRoutes = require("./routes/voiceRoutes");
 const ledgerRoutes = require("./routes/ledgerRoutes");
 const whatsappRoutes = require("./routes/whatsappRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 
 // ── Initialise Express ────────────────────────────────────────
 const app = express();
@@ -27,6 +28,7 @@ app.use("/api/voice-process", voiceRoutes);
 app.use("/api/ledger", ledgerRoutes);
 app.use("/api/send-whatsapp", whatsappRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/ai", aiRoutes);
 
 // ── Health Check ──────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
